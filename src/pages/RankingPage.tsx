@@ -1,0 +1,190 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { AppLayout } from '@/components/AppLayout';
+import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, addDays, subDays } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+type RankingEntry = {
+  user_id: string;
+  name: string;
+  total_points: number;
+  exact_count: number;
+  partial_count: number;
+  negative_count: number;
+};
+
+export default function RankingPage() {
+  const [tab, setTab] = useState<'geral' | 'dia'>('geral');
+  const [ranking, setRanking] = useState<RankingEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+
+  useEffect(() => {
+    fetchRanking();
+  }, [tab, selectedDate]);
+
+  const fetchRanking = async () => {
+    setLoading(true);
+
+    // Get all profiles
+    const { data: profiles } = await supabase.from('profiles').select('user_id, name').eq('is_approved', true);
+    if (!profiles) { setLoading(false); return; }
+
+    // Get scores, optionally filtered by date
+    let scoresQuery = supabase.from('scores').select('user_id, match_id, points');
+
+    if (tab === 'dia') {
+      // Get matches for selected date
+      const dayStart = new Date(selectedDate);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(selectedDate);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const { data: dayMatches } = await supabase
+        .from('matches')
+        .select('id')
+        .gte('match_datetime', dayStart.toISOString())
+        .lte('match_datetime', dayEnd.toISOString());
+
+      if (!dayMatches || dayMatches.length === 0) {
+        setRanking([]);
+        setLoading(false);
+        return;
+      }
+
+      scoresQuery = scoresQuery.in('match_id', dayMatches.map(m => m.id));
+    }
+
+    const { data: scoresData } = await scoresQuery;
+    if (!scoresData) { setLoading(false); return; }
+
+    // Aggregate per user
+    const userMap = new Map<string, RankingEntry>();
+    profiles.forEach(p => {
+      userMap.set(p.user_id, {
+        user_id: p.user_id,
+        name: p.name,
+        total_points: 0,
+        exact_count: 0,
+        partial_count: 0,
+        negative_count: 0,
+      });
+    });
+
+    scoresData.forEach(s => {
+      const entry = userMap.get(s.user_id);
+      if (!entry) return;
+      entry.total_points += s.points;
+      if (s.points === 5) entry.exact_count++;
+      else if (s.points === 2) entry.partial_count++;
+      else if (s.points === -1) entry.negative_count++;
+    });
+
+    // Sort by criteria
+    const sorted = Array.from(userMap.values()).sort((a, b) => {
+      if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+      if (b.exact_count !== a.exact_count) return b.exact_count - a.exact_count;
+      if (b.partial_count !== a.partial_count) return b.partial_count - a.partial_count;
+      return a.negative_count - b.negative_count;
+    });
+
+    setRanking(sorted);
+    setLoading(false);
+  };
+
+  const getMedalEmoji = (pos: number) => {
+    if (pos === 0) return '🥇';
+    if (pos === 1) return '🥈';
+    if (pos === 2) return '🥉';
+    return null;
+  };
+
+  return (
+    <AppLayout>
+      <div className="space-y-4">
+        {/* Tabs */}
+        <div className="flex gap-1 bg-secondary rounded-lg p-1">
+          {(['geral', 'dia'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex-1 py-2 rounded-md text-sm font-medium transition-all active:scale-[0.98] ${
+                tab === t ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'
+              }`}
+            >
+              {t === 'geral' ? 'Geral' : 'Do dia'}
+            </button>
+          ))}
+        </div>
+
+        {/* Date picker for daily */}
+        {tab === 'dia' && (
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={() => setSelectedDate(d => subDays(d, 1))}
+              className="p-1.5 rounded-lg hover:bg-secondary active:scale-95 transition-all"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <span className="text-sm font-medium min-w-[120px] text-center">
+              {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}
+            </span>
+            <button
+              onClick={() => setSelectedDate(d => addDays(d, 1))}
+              className="p-1.5 rounded-lg hover:bg-secondary active:scale-95 transition-all"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+
+        {/* Ranking List */}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : ranking.length === 0 ? (
+          <div className="glass-card p-8 text-center">
+            <p className="text-muted-foreground text-sm">Nenhum resultado ainda</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {ranking.map((entry, i) => {
+              const medal = getMedalEmoji(i);
+              return (
+                <div
+                  key={entry.user_id}
+                  className="glass-card p-3 flex items-center gap-3 animate-reveal-up"
+                  style={{ animationDelay: `${Math.min(i * 50, 300)}ms` }}
+                >
+                  <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                    {medal ? (
+                      <span className="text-sm">{medal}</span>
+                    ) : (
+                      <span className="text-xs font-bold text-muted-foreground">{i + 1}</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{entry.name}</p>
+                    <div className="flex gap-2 mt-0.5">
+                      <span className="text-[10px] text-score-exact font-medium">{entry.exact_count}×5</span>
+                      <span className="text-[10px] text-score-partial font-medium">{entry.partial_count}×2</span>
+                      {entry.negative_count > 0 && (
+                        <span className="text-[10px] text-score-negative font-medium">{entry.negative_count}×(-1)</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold tabular-nums">{entry.total_points}</p>
+                    <p className="text-[10px] text-muted-foreground">pts</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </AppLayout>
+  );
+}
