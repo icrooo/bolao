@@ -3,12 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Check, X, Plus, Trophy } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Loader2, Plus, Minus, Trophy } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-type Profile = { id: string; user_id: string; name: string; is_approved: boolean; created_at: string };
+type Profile = { id: string; user_id: string; name: string; email: string | null; is_approved: boolean; created_at: string };
 type Match = {
   id: string; home_team: string; away_team: string; match_datetime: string;
   group_name: string; home_score: number | null; away_score: number | null; is_finished: boolean;
@@ -22,7 +23,6 @@ export default function AdminPage() {
   const [showAddMatch, setShowAddMatch] = useState(false);
   const [newMatch, setNewMatch] = useState({ home_team: '', away_team: '', match_datetime: '', group_name: '' });
   const [finishingMatch, setFinishingMatch] = useState<string | null>(null);
-  const [resultInputs, setResultInputs] = useState<Map<string, { home: string; away: string }>>(new Map());
 
   useEffect(() => { fetchData(); }, []);
 
@@ -31,7 +31,7 @@ export default function AdminPage() {
       supabase.from('profiles').select('*').order('created_at', { ascending: false }),
       supabase.from('matches').select('*').order('match_datetime', { ascending: true }),
     ]);
-    if (profRes.data) setProfiles(profRes.data);
+    if (profRes.data) setProfiles(profRes.data as Profile[]);
     if (matchRes.data) setMatches(matchRes.data);
     setLoading(false);
   };
@@ -39,8 +39,8 @@ export default function AdminPage() {
   const approveUser = async (userId: string, approve: boolean) => {
     const { error } = await supabase.from('profiles').update({ is_approved: approve }).eq('user_id', userId);
     if (error) { toast.error(error.message); return; }
-    toast.success(approve ? 'Usuário aprovado!' : 'Usuário reprovado.');
-    fetchData();
+    toast.success(approve ? 'Usuário aprovado!' : 'Usuário bloqueado.');
+    setProfiles(prev => prev.map(p => p.user_id === userId ? { ...p, is_approved: approve } : p));
   };
 
   const addMatch = async () => {
@@ -60,26 +60,44 @@ export default function AdminPage() {
     fetchData();
   };
 
+  const updateScore = async (matchId: string, field: 'home_score' | 'away_score', delta: number) => {
+    const match = matches.find(m => m.id === matchId);
+    if (!match) return;
+
+    const currentVal = match[field] ?? 0;
+    const newVal = Math.max(0, currentVal + delta);
+
+    // Optimistic update
+    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, [field]: newVal } : m));
+
+    const { error } = await supabase.from('matches').update({ [field]: newVal }).eq('id', matchId);
+    if (error) {
+      toast.error(error.message);
+      setMatches(prev => prev.map(m => m.id === matchId ? { ...m, [field]: currentVal } : m));
+      return;
+    }
+
+    // Recalculate scores in real time
+    const otherField = field === 'home_score' ? 'away_score' : 'home_score';
+    const otherVal = match[otherField];
+    if (otherVal !== null) {
+      await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
+    }
+  };
+
   const finishMatch = async (matchId: string) => {
-    const result = resultInputs.get(matchId);
-    if (!result || result.home === '' || result.away === '') {
-      toast.error('Insira o placar final'); return;
+    const match = matches.find(m => m.id === matchId);
+    if (!match || match.home_score === null || match.away_score === null) {
+      toast.error('Defina o placar antes de encerrar'); return;
     }
     setFinishingMatch(matchId);
-    const { error } = await supabase.from('matches').update({
-      home_score: parseInt(result.home),
-      away_score: parseInt(result.away),
-      is_finished: true,
-    }).eq('id', matchId);
+    const { error } = await supabase.from('matches').update({ is_finished: true }).eq('id', matchId);
     if (error) { toast.error(error.message); setFinishingMatch(null); return; }
 
-    // Calculate scores
-    const { error: calcError } = await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
-    if (calcError) { toast.error('Erro ao calcular pontuação: ' + calcError.message); }
-    else { toast.success('Jogo encerrado e pontuação calculada!'); }
-
+    await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
+    toast.success('Jogo encerrado!');
     setFinishingMatch(null);
-    fetchData();
+    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, is_finished: true } : m));
   };
 
   if (loading) {
@@ -112,25 +130,16 @@ export default function AdminPage() {
           <div className="space-y-2">
             {profiles.map((p, i) => (
               <div key={p.id} className="glass-card p-3 flex items-center justify-between animate-reveal-up" style={{ animationDelay: `${i * 50}ms` }}>
-                <div>
-                  <p className="font-medium text-sm">{p.name}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {format(new Date(p.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                    {p.is_approved ? ' · Aprovado' : ' · Pendente'}
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm truncate">{p.name}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">
+                    {p.email ?? 'Sem e-mail'} · {format(new Date(p.created_at), "dd/MM/yyyy", { locale: ptBR })}
                   </p>
                 </div>
-                <div className="flex gap-1">
-                  {!p.is_approved && (
-                    <button onClick={() => approveUser(p.user_id, true)} className="h-8 w-8 flex items-center justify-center rounded-lg bg-primary/10 text-primary hover:bg-primary/20 active:scale-95 transition-all">
-                      <Check className="h-4 w-4" />
-                    </button>
-                  )}
-                  {p.is_approved && (
-                    <button onClick={() => approveUser(p.user_id, false)} className="h-8 w-8 flex items-center justify-center rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 active:scale-95 transition-all">
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
+                <Switch
+                  checked={p.is_approved}
+                  onCheckedChange={(checked) => approveUser(p.user_id, checked)}
+                />
               </div>
             ))}
           </div>
@@ -156,56 +165,86 @@ export default function AdminPage() {
               </div>
             )}
 
-            {matches.map((m, i) => {
-              const result = resultInputs.get(m.id) ?? { home: '', away: '' };
-              return (
-                <div key={m.id} className="glass-card p-4 animate-reveal-up" style={{ animationDelay: `${i * 50}ms` }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                      Grupo {m.group_name} · {format(new Date(m.match_datetime), "dd MMM HH:mm", { locale: ptBR })}
+            {matches.map((m, i) => (
+              <div key={m.id} className="glass-card p-4 animate-reveal-up" style={{ animationDelay: `${i * 50}ms` }}>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                    Grupo {m.group_name} · {format(new Date(m.match_datetime), "dd MMM HH:mm", { locale: ptBR })}
+                  </span>
+                  {m.is_finished && (
+                    <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                      <Trophy className="h-3 w-3" /> Encerrado
                     </span>
-                    {m.is_finished && (
-                      <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-                        <Trophy className="h-3 w-3" /> Encerrado
-                      </span>
-                    )}
-                  </div>
-                  <p className="font-medium text-sm">
-                    {m.home_team} {m.is_finished ? `${m.home_score} × ${m.away_score}` : '×'} {m.away_team}
-                  </p>
-
-                  {!m.is_finished && (
-                    <div className="flex items-center gap-2 mt-3">
-                      <Input
-                        type="number"
-                        min={0}
-                        placeholder="Casa"
-                        className="w-16 h-8 text-center text-sm"
-                        value={result.home}
-                        onChange={e => setResultInputs(prev => new Map(prev).set(m.id, { ...result, home: e.target.value }))}
-                      />
-                      <span className="text-muted-foreground text-xs">×</span>
-                      <Input
-                        type="number"
-                        min={0}
-                        placeholder="Fora"
-                        className="w-16 h-8 text-center text-sm"
-                        value={result.away}
-                        onChange={e => setResultInputs(prev => new Map(prev).set(m.id, { ...result, away: e.target.value }))}
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => finishMatch(m.id)}
-                        disabled={finishingMatch === m.id}
-                        className="h-8 text-xs active:scale-95"
-                      >
-                        {finishingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Encerrar'}
-                      </Button>
-                    </div>
                   )}
                 </div>
-              );
-            })}
+
+                {m.is_finished ? (
+                  <p className="font-medium text-sm text-center">
+                    {m.home_team} {m.home_score} × {m.away_score} {m.away_team}
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      {/* Home team */}
+                      <div className="flex-1 text-right">
+                        <p className="text-sm font-medium truncate">{m.home_team}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => updateScore(m.id, 'home_score', -1)}
+                          className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary hover:bg-secondary/80 active:scale-90 transition-all"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span className="w-8 text-center font-bold tabular-nums text-lg">
+                          {m.home_score ?? 0}
+                        </span>
+                        <button
+                          onClick={() => updateScore(m.id, 'home_score', 1)}
+                          className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary hover:bg-secondary/80 active:scale-90 transition-all"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
+
+                      <span className="text-muted-foreground text-xs">×</span>
+
+                      {/* Away team */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => updateScore(m.id, 'away_score', -1)}
+                          className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary hover:bg-secondary/80 active:scale-90 transition-all"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span className="w-8 text-center font-bold tabular-nums text-lg">
+                          {m.away_score ?? 0}
+                        </span>
+                        <button
+                          onClick={() => updateScore(m.id, 'away_score', 1)}
+                          className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary hover:bg-secondary/80 active:scale-90 transition-all"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium truncate">{m.away_team}</p>
+                      </div>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => finishMatch(m.id)}
+                      disabled={finishingMatch === m.id}
+                      className="w-full mt-3 text-xs active:scale-95"
+                    >
+                      {finishingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '🏁 Encerrar Jogo'}
+                    </Button>
+                  </>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
