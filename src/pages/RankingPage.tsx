@@ -24,6 +24,17 @@ export default function RankingPage() {
     fetchRanking();
   }, [tab, selectedDate]);
 
+  // Realtime subscription for live ranking updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('scores-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' },
+        () => fetchRanking()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [tab, selectedDate]);
+
   const fetchRanking = async () => {
     setLoading(true);
 
