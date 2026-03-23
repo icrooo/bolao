@@ -226,6 +226,7 @@ export default function PredictionsPage() {
         </div>
 
         {/* Match Cards */}
+        {/* Group headers when GRUPOS filter is active */}
         {filteredMatches.length === 0 ? (
           <div className="glass-card p-8 text-center">
             <p className="text-muted-foreground text-sm">Nenhum jogo encontrado</p>

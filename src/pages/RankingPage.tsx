@@ -168,7 +168,9 @@ export default function RankingPage() {
               return (
                 <div
                   key={entry.user_id}
-                  className="glass-card p-3 flex items-center gap-3 animate-reveal-up"
+                  className={`glass-card p-3 flex items-center gap-3 animate-reveal-up ${
+                    entry.user_id === user?.id ? 'ring-2 ring-primary bg-primary/5' : ''
+                  }`}
                   style={{ animationDelay: `${Math.min(i * 50, 300)}ms` }}
                 >
                   <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
