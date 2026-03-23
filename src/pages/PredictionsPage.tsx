@@ -210,7 +210,7 @@ export default function PredictionsPage() {
       <div className="space-y-4">
         {/* Filters */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none">
-          {[...FILTERS, ...GROUPS].map(f => (
+          {FILTERS.map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
