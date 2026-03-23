@@ -56,15 +56,14 @@ function CountdownTimer({ datetime }: { datetime: string }) {
 
   if (secondsLeft <= 0) return <span className="text-xs text-destructive flex items-center gap-1"><Lock className="h-3 w-3" /> Bloqueado</span>;
 
-  const h = Math.floor(secondsLeft / 3600);
+  const d = Math.floor(secondsLeft / 86400);
+  const h = Math.floor((secondsLeft % 86400) / 3600);
   const m = Math.floor((secondsLeft % 3600) / 60);
   const s = secondsLeft % 60;
 
-  if (h > 24) return null;
-
   return (
     <span className="text-xs text-muted-foreground tabular-nums">
-      {h > 0 ? `${h}h ` : ''}{m.toString().padStart(2, '0')}:{s.toString().padStart(2, '0')}
+      {d > 0 ? `${d}d ` : ''}{h.toString().padStart(2, '0')}h {m.toString().padStart(2, '0')}min {s.toString().padStart(2, '0')}s
     </span>
   );
 }
