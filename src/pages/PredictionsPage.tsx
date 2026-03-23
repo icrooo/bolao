@@ -31,7 +31,7 @@ type Score = {
   points: number;
 };
 
-const FILTERS = ['TODOS', 'HOJE', 'EM ABERTO'] as const;
+const FILTERS = ['TODOS', 'HOJE', 'EM ABERTO', 'GRUPOS'] as const;
 const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
 
 function ScoreBadge({ points }: { points: number }) {
