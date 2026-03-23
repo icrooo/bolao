@@ -31,7 +31,7 @@ type Score = {
   points: number;
 };
 
-const FILTERS = ['TODOS', 'HOJE', 'EM ABERTO'] as const;
+const FILTERS = ['TODOS', 'HOJE', 'EM ABERTO', 'GRUPOS'] as const;
 const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
 
 function ScoreBadge({ points }: { points: number }) {
@@ -56,15 +56,14 @@ function CountdownTimer({ datetime }: { datetime: string }) {
 
   if (secondsLeft <= 0) return <span className="text-xs text-destructive flex items-center gap-1"><Lock className="h-3 w-3" /> Bloqueado</span>;
 
-  const h = Math.floor(secondsLeft / 3600);
+  const d = Math.floor(secondsLeft / 86400);
+  const h = Math.floor((secondsLeft % 86400) / 3600);
   const m = Math.floor((secondsLeft % 3600) / 60);
   const s = secondsLeft % 60;
 
-  if (h > 24) return null;
-
   return (
     <span className="text-xs text-muted-foreground tabular-nums">
-      {h > 0 ? `${h}h ` : ''}{m.toString().padStart(2, '0')}:{s.toString().padStart(2, '0')}
+      {d > 0 ? `${d}d ` : ''}{h.toString().padStart(2, '0')}h {m.toString().padStart(2, '0')}min {s.toString().padStart(2, '0')}s
     </span>
   );
 }
@@ -134,15 +133,19 @@ export default function PredictionsPage() {
   };
 
   const filteredMatches = useMemo(() => {
-    return matches.filter(m => {
-      if (GROUPS.includes(filter)) return m.group_name === filter;
+    let filtered = matches.filter(m => {
+      if (filter === 'GRUPOS') return true;
       if (filter === 'HOJE') {
-        const d = new Date(m.match_datetime);
-        return isToday(d) || isTomorrow(d);
+        const dt = new Date(m.match_datetime);
+        return isToday(dt) || isTomorrow(dt);
       }
       if (filter === 'EM ABERTO') return !predictions.has(m.id) && !isLocked(m);
       return true;
     });
+    if (filter === 'GRUPOS') {
+      filtered = [...filtered].sort((a, b) => a.group_name.localeCompare(b.group_name) || new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime());
+    }
+    return filtered;
   }, [matches, filter, predictions]);
 
   const getDraft = (matchId: string) => {
@@ -207,7 +210,7 @@ export default function PredictionsPage() {
       <div className="space-y-4">
         {/* Filters */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none">
-          {[...FILTERS, ...GROUPS].map(f => (
+          {FILTERS.map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -223,6 +226,7 @@ export default function PredictionsPage() {
         </div>
 
         {/* Match Cards */}
+        {/* Group headers when GRUPOS filter is active */}
         {filteredMatches.length === 0 ? (
           <div className="glass-card p-8 text-center">
             <p className="text-muted-foreground text-sm">Nenhum jogo encontrado</p>
