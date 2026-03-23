@@ -133,15 +133,19 @@ export default function PredictionsPage() {
   };
 
   const filteredMatches = useMemo(() => {
-    return matches.filter(m => {
-      if (GROUPS.includes(filter)) return m.group_name === filter;
+    let filtered = matches.filter(m => {
+      if (filter === 'GRUPOS') return true;
       if (filter === 'HOJE') {
-        const d = new Date(m.match_datetime);
-        return isToday(d) || isTomorrow(d);
+        const dt = new Date(m.match_datetime);
+        return isToday(dt) || isTomorrow(dt);
       }
       if (filter === 'EM ABERTO') return !predictions.has(m.id) && !isLocked(m);
       return true;
     });
+    if (filter === 'GRUPOS') {
+      filtered = [...filtered].sort((a, b) => a.group_name.localeCompare(b.group_name) || new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime());
+    }
+    return filtered;
   }, [matches, filter, predictions]);
 
   const getDraft = (matchId: string) => {
