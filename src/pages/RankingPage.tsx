@@ -16,6 +16,7 @@ type RankingEntry = {
 };
 
 export default function RankingPage() {
+  const { user } = useAuth();
   const [tab, setTab] = useState<'geral' | 'dia'>('geral');
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
   const [loading, setLoading] = useState(true);
