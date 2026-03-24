@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useServerTime } from '@/hooks/useServerTime';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Loader2, Check, Lock, Minus, Plus } from 'lucide-react';
@@ -32,7 +33,6 @@ type Score = {
 };
 
 const FILTERS = ['TODOS', 'HOJE', 'EM ABERTO', 'GRUPOS'] as const;
-const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
 
 function ScoreBadge({ points }: { points: number }) {
   const cls = points === 5 ? 'score-badge-5' : points === 2 ? 'score-badge-2' : points === -1 ? 'score-badge-negative' : 'score-badge-0';
@@ -43,16 +43,16 @@ function ScoreBadge({ points }: { points: number }) {
   );
 }
 
-function CountdownTimer({ datetime }: { datetime: string }) {
+function CountdownTimer({ datetime, serverNow }: { datetime: string; serverNow: () => number }) {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const lockTime = new Date(new Date(datetime).getTime() - 30 * 60 * 1000);
 
   useEffect(() => {
-    const update = () => setSecondsLeft(Math.max(0, differenceInSeconds(lockTime, new Date())));
+    const update = () => setSecondsLeft(Math.max(0, differenceInSeconds(lockTime, new Date(serverNow()))));
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [datetime]);
+  }, [datetime, serverNow]);
 
   if (secondsLeft <= 0) return <span className="text-xs text-destructive flex items-center gap-1"><Lock className="h-3 w-3" /> Bloqueado</span>;
 
@@ -63,7 +63,7 @@ function CountdownTimer({ datetime }: { datetime: string }) {
 
   return (
     <span className="text-xs text-muted-foreground tabular-nums">
-      {d > 0 ? `${d}d ` : ''}{h.toString().padStart(2, '0')}h {m.toString().padStart(2, '0')}min {s.toString().padStart(2, '0')}s
+      Bloqueia em {d > 0 ? `${d}d ` : ''}{h.toString().padStart(2, '0')}h {m.toString().padStart(2, '0')}min {s.toString().padStart(2, '0')}s
     </span>
   );
 }
@@ -92,8 +92,19 @@ function ScoreInput({ value, onChange, disabled }: { value: number; onChange: (v
   );
 }
 
+/** Calculate points for a prediction given actual scores */
+function calcPoints(pred: Prediction, homeScore: number, awayScore: number): number {
+  if (pred.home_score_pred === homeScore && pred.away_score_pred === awayScore) return 5;
+  const predDiff = pred.home_score_pred - pred.away_score_pred;
+  const actualDiff = homeScore - awayScore;
+  if ((predDiff > 0 && actualDiff > 0) || (predDiff < 0 && actualDiff < 0) || (predDiff === 0 && actualDiff === 0)) return 2;
+  if ((predDiff > 0 && actualDiff < 0) || (predDiff < 0 && actualDiff > 0)) return -1;
+  return 0;
+}
+
 export default function PredictionsPage() {
   const { user } = useAuth();
+  const { now: serverNow } = useServerTime();
   const [matches, setMatches] = useState<Match[]>([]);
   const [predictions, setPredictions] = useState<Map<string, Prediction>>(new Map());
   const [scores, setScores] = useState<Map<string, Score>>(new Map());
@@ -105,6 +116,35 @@ export default function PredictionsPage() {
   useEffect(() => {
     fetchData();
   }, [user]);
+
+  // Realtime: listen for match score changes to show partial points
+  useEffect(() => {
+    const channel = supabase
+      .channel('matches-realtime-pred')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' }, () => {
+        fetchMatches();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => {
+        fetchScores();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  const fetchMatches = async () => {
+    const { data } = await supabase.from('matches').select('*').order('match_datetime', { ascending: true });
+    if (data) setMatches(data);
+  };
+
+  const fetchScores = async () => {
+    if (!user) return;
+    const { data } = await supabase.from('scores').select('*').eq('user_id', user.id);
+    if (data) {
+      const map = new Map<string, Score>();
+      data.forEach(s => map.set(s.match_id, s));
+      setScores(map);
+    }
+  };
 
   const fetchData = async () => {
     if (!user) return;
@@ -129,7 +169,7 @@ export default function PredictionsPage() {
   };
 
   const isLocked = (match: Match) => {
-    return match.is_finished || new Date(match.match_datetime).getTime() - 30 * 60 * 1000 <= Date.now();
+    return match.is_finished || new Date(match.match_datetime).getTime() - 30 * 60 * 1000 <= serverNow();
   };
 
   const filteredMatches = useMemo(() => {
@@ -195,6 +235,13 @@ export default function PredictionsPage() {
     return draft.home !== pred.home_score_pred || draft.away !== pred.away_score_pred;
   };
 
+  /** Get partial points for an ongoing match */
+  const getPartialPoints = (match: Match, pred: Prediction | undefined) => {
+    if (!pred) return null;
+    if (match.home_score === null || match.away_score === null) return null;
+    return calcPoints(pred, match.home_score, match.away_score);
+  };
+
   if (loading) {
     return (
       <AppLayout>
@@ -226,7 +273,6 @@ export default function PredictionsPage() {
         </div>
 
         {/* Match Cards */}
-        {/* Group headers when GRUPOS filter is active */}
         {filteredMatches.length === 0 ? (
           <div className="glass-card p-8 text-center">
             <p className="text-muted-foreground text-sm">Nenhum jogo encontrado</p>
@@ -239,11 +285,14 @@ export default function PredictionsPage() {
               const score = scores.get(match.id);
               const draft = getDraft(match.id);
               const changed = hasDraftChanged(match.id);
+              const partialPoints = !match.is_finished ? getPartialPoints(match, pred) : null;
 
               return (
                 <div
                   key={match.id}
-                  className="glass-card p-4 animate-reveal-up"
+                  className={`glass-card p-4 animate-reveal-up ${
+                    match.is_finished ? 'border-l-4 border-l-primary/40 opacity-80' : ''
+                  }`}
                   style={{ animationDelay: `${Math.min(i * 60, 300)}ms` }}
                 >
                   {/* Header */}
@@ -251,8 +300,16 @@ export default function PredictionsPage() {
                     <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                       Grupo {match.group_name} · {format(new Date(match.match_datetime), "dd MMM · HH:mm", { locale: ptBR })}
                     </span>
-                    {match.is_finished && score && <ScoreBadge points={score.points} />}
-                    {!match.is_finished && <CountdownTimer datetime={match.match_datetime} />}
+                    <div className="flex items-center gap-2">
+                      {match.is_finished && score && <ScoreBadge points={score.points} />}
+                      {match.is_finished && !score && (
+                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                          Encerrado
+                        </span>
+                      )}
+                      {!match.is_finished && partialPoints !== null && <ScoreBadge points={partialPoints} />}
+                      {!match.is_finished && <CountdownTimer datetime={match.match_datetime} serverNow={serverNow} />}
+                    </div>
                   </div>
 
                   {/* Teams + Scores */}

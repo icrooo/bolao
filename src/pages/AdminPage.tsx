@@ -4,7 +4,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Plus, Minus, Trophy, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Trophy, Trash2, Pencil, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -23,6 +23,11 @@ export default function AdminPage() {
   const [showAddMatch, setShowAddMatch] = useState(false);
   const [newMatch, setNewMatch] = useState({ home_team: '', away_team: '', match_datetime: '', group_name: '' });
   const [finishingMatch, setFinishingMatch] = useState<string | null>(null);
+  const [editingMatch, setEditingMatch] = useState<string | null>(null);
+  const [editData, setEditData] = useState({ home_team: '', away_team: '', match_datetime: '', group_name: '' });
+  // Score drafts for input fields
+  const [scoreDrafts, setScoreDrafts] = useState<Map<string, { home: string; away: string }>>(new Map());
+  const [updatingScore, setUpdatingScore] = useState<string | null>(null);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -60,28 +65,79 @@ export default function AdminPage() {
     fetchData();
   };
 
-  const updateScore = async (matchId: string, field: 'home_score' | 'away_score', delta: number) => {
-    const match = matches.find(m => m.id === matchId);
-    if (!match) return;
+  const startEdit = (m: Match) => {
+    setEditingMatch(m.id);
+    setEditData({
+      home_team: m.home_team,
+      away_team: m.away_team,
+      match_datetime: format(new Date(m.match_datetime), "yyyy-MM-dd'T'HH:mm"),
+      group_name: m.group_name,
+    });
+  };
 
-    const currentVal = match[field] ?? 0;
-    const newVal = Math.max(0, currentVal + delta);
-    const otherField = field === 'home_score' ? 'away_score' : 'home_score';
-    const otherVal = match[otherField] ?? 0;
+  const saveEdit = async (matchId: string) => {
+    if (!editData.home_team || !editData.away_team || !editData.match_datetime || !editData.group_name) {
+      toast.error('Preencha todos os campos'); return;
+    }
+    const { error } = await supabase.from('matches').update({
+      home_team: editData.home_team,
+      away_team: editData.away_team,
+      match_datetime: new Date(editData.match_datetime).toISOString(),
+      group_name: editData.group_name,
+    }).eq('id', matchId);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Jogo atualizado!');
+    setEditingMatch(null);
+    fetchData();
+  };
 
-    // Optimistic update — ensure both fields have numeric values
-    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, [field]: newVal, [otherField]: otherVal } : m));
+  const getScoreDraft = (m: Match) => {
+    const draft = scoreDrafts.get(m.id);
+    return draft ?? { home: m.home_score?.toString() ?? '', away: m.away_score?.toString() ?? '' };
+  };
 
-    const updatePayload = { [field]: newVal, ...(match[otherField] === null ? { [otherField]: 0 } : {}) };
-    const { error } = await supabase.from('matches').update(updatePayload).eq('id', matchId);
+  const setScoreDraft = (matchId: string, field: 'home' | 'away', value: string) => {
+    // Allow only digits
+    if (value !== '' && !/^\d+$/.test(value)) return;
+    setScoreDrafts(prev => {
+      const n = new Map(prev);
+      const current = n.get(matchId) ?? { home: '', away: '' };
+      n.set(matchId, { ...current, [field]: value });
+      return n;
+    });
+  };
+
+  const updateScore = async (matchId: string) => {
+    const draft = getScoreDraft(matches.find(m => m.id === matchId)!);
+    const homeVal = draft.home === '' ? null : parseInt(draft.home);
+    const awayVal = draft.away === '' ? null : parseInt(draft.away);
+
+    setUpdatingScore(matchId);
+
+    const { error } = await supabase.from('matches').update({
+      home_score: homeVal,
+      away_score: awayVal,
+    }).eq('id', matchId);
+
     if (error) {
       toast.error(error.message);
-      setMatches(prev => prev.map(m => m.id === matchId ? { ...m, [field]: currentVal } : m));
+      setUpdatingScore(null);
       return;
     }
 
-    // Always recalculate scores — enables real-time ranking
-    await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
+    // Recalculate scores only if both values are set
+    if (homeVal !== null && awayVal !== null) {
+      await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
+    } else {
+      // If either is null, clear existing scores for this match
+      await supabase.from('scores').delete().eq('match_id', matchId);
+    }
+
+    toast.success('Placar atualizado!');
+    setUpdatingScore(null);
+    // Clear draft
+    setScoreDrafts(prev => { const n = new Map(prev); n.delete(matchId); return n; });
+    fetchData();
   };
 
   const deleteMatch = async (matchId: string) => {
@@ -95,7 +151,7 @@ export default function AdminPage() {
   const finishMatch = async (matchId: string) => {
     const match = matches.find(m => m.id === matchId);
     if (!match || match.home_score === null || match.away_score === null) {
-      toast.error('Defina o placar antes de encerrar'); return;
+      toast.error('Atualize o placar antes de encerrar'); return;
     }
     setFinishingMatch(matchId);
     const { error } = await supabase.from('matches').update({ is_finished: true }).eq('id', matchId);
@@ -104,7 +160,7 @@ export default function AdminPage() {
     await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
     toast.success('Jogo encerrado!');
     setFinishingMatch(null);
-    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, is_finished: true } : m));
+    fetchData();
   };
 
   if (loading) {
@@ -184,6 +240,14 @@ export default function AdminPage() {
                         <Trophy className="h-3 w-3" /> Encerrado
                       </span>
                     )}
+                    {!m.is_finished && (
+                      <button
+                        onClick={() => editingMatch === m.id ? setEditingMatch(null) : startEdit(m)}
+                        className="text-muted-foreground hover:text-foreground active:scale-90 transition-all"
+                      >
+                        {editingMatch === m.id ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                      </button>
+                    )}
                     <button
                       onClick={() => deleteMatch(m.id)}
                       className="text-destructive hover:text-destructive/80 active:scale-90 transition-all"
@@ -193,69 +257,73 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {m.is_finished ? (
+                {/* Edit mode */}
+                {editingMatch === m.id ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input placeholder="Time casa" value={editData.home_team} onChange={e => setEditData({ ...editData, home_team: e.target.value })} />
+                      <Input placeholder="Time fora" value={editData.away_team} onChange={e => setEditData({ ...editData, away_team: e.target.value })} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input type="datetime-local" value={editData.match_datetime} onChange={e => setEditData({ ...editData, match_datetime: e.target.value })} />
+                      <Input placeholder="Grupo" maxLength={1} value={editData.group_name} onChange={e => setEditData({ ...editData, group_name: e.target.value.toUpperCase() })} />
+                    </div>
+                    <Button size="sm" onClick={() => saveEdit(m.id)} className="w-full active:scale-95">Salvar alterações</Button>
+                  </div>
+                ) : m.is_finished ? (
                   <p className="font-medium text-sm text-center">
                     {m.home_team} {m.home_score} × {m.away_score} {m.away_team}
                   </p>
                 ) : (
                   <>
+                    {/* Score input fields */}
                     <div className="flex items-center justify-between gap-2">
-                      {/* Home team */}
                       <div className="flex-1 text-right">
                         <p className="text-sm font-medium truncate">{m.home_team}</p>
                       </div>
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => updateScore(m.id, 'home_score', -1)}
-                          className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary hover:bg-secondary/80 active:scale-90 transition-all"
-                        >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                        <span className="w-8 text-center font-bold tabular-nums text-lg">
-                          {m.home_score ?? 0}
-                        </span>
-                        <button
-                          onClick={() => updateScore(m.id, 'home_score', 1)}
-                          className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary hover:bg-secondary/80 active:scale-90 transition-all"
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
-                      </div>
-
-                      <span className="text-muted-foreground text-xs">×</span>
-
-                      {/* Away team */}
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => updateScore(m.id, 'away_score', -1)}
-                          className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary hover:bg-secondary/80 active:scale-90 transition-all"
-                        >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                        <span className="w-8 text-center font-bold tabular-nums text-lg">
-                          {m.away_score ?? 0}
-                        </span>
-                        <button
-                          onClick={() => updateScore(m.id, 'away_score', 1)}
-                          className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary hover:bg-secondary/80 active:scale-90 transition-all"
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          value={getScoreDraft(m).home}
+                          onChange={e => setScoreDraft(m.id, 'home', e.target.value)}
+                          className="w-12 h-9 text-center font-bold tabular-nums p-0"
+                          placeholder="-"
+                        />
+                        <span className="text-muted-foreground text-xs mx-1">×</span>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          value={getScoreDraft(m).away}
+                          onChange={e => setScoreDraft(m.id, 'away', e.target.value)}
+                          className="w-12 h-9 text-center font-bold tabular-nums p-0"
+                          placeholder="-"
+                        />
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-medium truncate">{m.away_team}</p>
                       </div>
                     </div>
 
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => finishMatch(m.id)}
-                      disabled={finishingMatch === m.id}
-                      className="w-full mt-3 text-xs active:scale-95"
-                    >
-                      {finishingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '🏁 Encerrar Jogo'}
-                    </Button>
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        size="sm"
+                        onClick={() => updateScore(m.id)}
+                        disabled={updatingScore === m.id}
+                        className="flex-1 text-xs active:scale-95"
+                      >
+                        {updatingScore === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '⚽ Atualizar Placar'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => finishMatch(m.id)}
+                        disabled={finishingMatch === m.id}
+                        className="flex-1 text-xs active:scale-95"
+                      >
+                        {finishingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '🏁 Encerrar Jogo'}
+                      </Button>
+                    </div>
                   </>
                 )}
               </div>
