@@ -66,23 +66,30 @@ export default function AdminPage() {
 
     const currentVal = match[field] ?? 0;
     const newVal = Math.max(0, currentVal + delta);
+    const otherField = field === 'home_score' ? 'away_score' : 'home_score';
+    const otherVal = match[otherField] ?? 0;
 
-    // Optimistic update
-    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, [field]: newVal } : m));
+    // Optimistic update — ensure both fields have numeric values
+    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, [field]: newVal, [otherField]: otherVal } : m));
 
-    const { error } = await supabase.from('matches').update({ [field]: newVal }).eq('id', matchId);
+    const updatePayload = { [field]: newVal, ...(match[otherField] === null ? { [otherField]: 0 } : {}) };
+    const { error } = await supabase.from('matches').update(updatePayload).eq('id', matchId);
     if (error) {
       toast.error(error.message);
       setMatches(prev => prev.map(m => m.id === matchId ? { ...m, [field]: currentVal } : m));
       return;
     }
 
-    // Recalculate scores in real time
-    const otherField = field === 'home_score' ? 'away_score' : 'home_score';
-    const otherVal = match[otherField];
-    if (otherVal !== null) {
-      await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
-    }
+    // Always recalculate scores — enables real-time ranking
+    await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
+  };
+
+  const deleteMatch = async (matchId: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este jogo? Todos os palpites e pontos serão removidos.')) return;
+    const { error } = await supabase.from('matches').delete().eq('id', matchId);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Jogo excluído!');
+    setMatches(prev => prev.filter(m => m.id !== matchId));
   };
 
   const finishMatch = async (matchId: string) => {
