@@ -4,7 +4,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Plus, Minus, Trophy } from 'lucide-react';
+import { Loader2, Plus, Minus, Trophy, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -66,23 +66,30 @@ export default function AdminPage() {
 
     const currentVal = match[field] ?? 0;
     const newVal = Math.max(0, currentVal + delta);
+    const otherField = field === 'home_score' ? 'away_score' : 'home_score';
+    const otherVal = match[otherField] ?? 0;
 
-    // Optimistic update
-    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, [field]: newVal } : m));
+    // Optimistic update — ensure both fields have numeric values
+    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, [field]: newVal, [otherField]: otherVal } : m));
 
-    const { error } = await supabase.from('matches').update({ [field]: newVal }).eq('id', matchId);
+    const updatePayload = { [field]: newVal, ...(match[otherField] === null ? { [otherField]: 0 } : {}) };
+    const { error } = await supabase.from('matches').update(updatePayload).eq('id', matchId);
     if (error) {
       toast.error(error.message);
       setMatches(prev => prev.map(m => m.id === matchId ? { ...m, [field]: currentVal } : m));
       return;
     }
 
-    // Recalculate scores in real time
-    const otherField = field === 'home_score' ? 'away_score' : 'home_score';
-    const otherVal = match[otherField];
-    if (otherVal !== null) {
-      await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
-    }
+    // Always recalculate scores — enables real-time ranking
+    await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
+  };
+
+  const deleteMatch = async (matchId: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este jogo? Todos os palpites e pontos serão removidos.')) return;
+    const { error } = await supabase.from('matches').delete().eq('id', matchId);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Jogo excluído!');
+    setMatches(prev => prev.filter(m => m.id !== matchId));
   };
 
   const finishMatch = async (matchId: string) => {
@@ -171,11 +178,19 @@ export default function AdminPage() {
                   <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                     Grupo {m.group_name} · {format(new Date(m.match_datetime), "dd MMM HH:mm", { locale: ptBR })}
                   </span>
-                  {m.is_finished && (
-                    <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-                      <Trophy className="h-3 w-3" /> Encerrado
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {m.is_finished && (
+                      <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                        <Trophy className="h-3 w-3" /> Encerrado
+                      </span>
+                    )}
+                    <button
+                      onClick={() => deleteMatch(m.id)}
+                      className="text-destructive hover:text-destructive/80 active:scale-90 transition-all"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {m.is_finished ? (
