@@ -178,11 +178,19 @@ export default function AdminPage() {
                   <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                     Grupo {m.group_name} · {format(new Date(m.match_datetime), "dd MMM HH:mm", { locale: ptBR })}
                   </span>
-                  {m.is_finished && (
-                    <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-                      <Trophy className="h-3 w-3" /> Encerrado
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {m.is_finished && (
+                      <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                        <Trophy className="h-3 w-3" /> Encerrado
+                      </span>
+                    )}
+                    <button
+                      onClick={() => deleteMatch(m.id)}
+                      className="text-destructive hover:text-destructive/80 active:scale-90 transition-all"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {m.is_finished ? (
