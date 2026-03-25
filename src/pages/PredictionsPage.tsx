@@ -1,13 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useServerTime } from '@/hooks/useServerTime';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, Check, Lock, Minus, Plus } from 'lucide-react';
+import { Loader2, Check, Lock, Minus, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, isToday, isTomorrow, differenceInSeconds } from 'date-fns';
+import { format, isToday, isTomorrow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 type Match = {
@@ -33,6 +32,15 @@ type Score = {
   match_id: string;
   points: number;
 };
+
+type AllPrediction = {
+  user_id: string;
+  match_id: string;
+  home_score_pred: number;
+  away_score_pred: number;
+};
+
+type Profile = { user_id: string; name: string };
 
 const FILTERS = ['TODOS', 'HOJE', 'EM ABERTO', 'GRUPOS'] as const;
 
@@ -71,12 +79,16 @@ function MatchStatusBadge({ match, serverNow }: { match: Match; serverNow: () =>
   return null;
 }
 
-function CountdownTimer({ datetime, serverNow }: { datetime: string; serverNow: () => number }) {
+function CountdownTimer({ datetime, serverNow, onExpired }: { datetime: string; serverNow: () => number; onExpired?: () => void }) {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const lockTime = new Date(new Date(datetime).getTime() - 30 * 60 * 1000);
 
   useEffect(() => {
-    const update = () => setSecondsLeft(Math.max(0, differenceInSeconds(lockTime, new Date(serverNow()))));
+    const update = () => {
+      const left = Math.max(0, Math.floor((lockTime.getTime() - serverNow()) / 1000));
+      setSecondsLeft(left);
+      if (left <= 0 && onExpired) onExpired();
+    };
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
@@ -121,17 +133,92 @@ function ScoreInput({ value, onChange, disabled }: { value: number; onChange: (v
 }
 
 /** Calculate points for a prediction given actual scores */
-function calcPoints(pred: Prediction, homeScore: number, awayScore: number): number {
-  // 1. Exact score
+function calcPoints(pred: { home_score_pred: number; away_score_pred: number }, homeScore: number, awayScore: number): number {
   if (pred.home_score_pred === homeScore && pred.away_score_pred === awayScore) return 5;
-  // 2. Inverse score (swapped) — priority over tendency
   if (pred.home_score_pred === awayScore && pred.away_score_pred === homeScore) return -1;
-  // 3. Correct tendency
   if ((pred.home_score_pred > pred.away_score_pred && homeScore > awayScore) ||
       (pred.home_score_pred < pred.away_score_pred && homeScore < awayScore) ||
       (pred.home_score_pred === pred.away_score_pred && homeScore === awayScore)) return 2;
-  // 4. Otherwise
   return 0;
+}
+
+function ExpandablePredictions({
+  match, currentUserId, allPredictions, allProfiles, allScores,
+}: {
+  match: Match;
+  currentUserId: string;
+  allPredictions: AllPrediction[];
+  allProfiles: Profile[];
+  allScores: { user_id: string; match_id: string; points: number }[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  const matchPreds = allPredictions.filter(p => p.match_id === match.id);
+  const matchScores = allScores.filter(s => s.match_id === match.id);
+
+  // Build list: current user first, then alphabetical
+  const entries = matchPreds.map(p => {
+    const profile = allProfiles.find(pr => pr.user_id === p.user_id);
+    const score = matchScores.find(s => s.user_id === p.user_id);
+    const partialPts = (match.home_score !== null && match.away_score !== null)
+      ? calcPoints(p, match.home_score, match.away_score)
+      : null;
+    return {
+      user_id: p.user_id,
+      name: profile?.name ?? 'Desconhecido',
+      home_score_pred: p.home_score_pred,
+      away_score_pred: p.away_score_pred,
+      points: score?.points ?? partialPts,
+    };
+  });
+
+  entries.sort((a, b) => {
+    if (a.user_id === currentUserId) return -1;
+    if (b.user_id === currentUserId) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full justify-center py-1"
+      >
+        <span>{open ? 'Ocultar palpites' : 'Ver palpites'}</span>
+        {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-1 animate-reveal-up">
+          {entries.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-2">Nenhum palpite registrado</p>
+          ) : entries.map(e => {
+            const getColor = (pts: number | null) => {
+              if (pts === null) return 'bg-secondary';
+              if (pts === 5) return 'bg-score-exact text-primary-foreground';
+              if (pts === 2) return 'bg-score-partial text-accent-foreground';
+              if (pts === -1) return 'bg-score-negative text-destructive-foreground';
+              return 'bg-score-miss text-primary-foreground';
+            };
+            return (
+              <div key={e.user_id} className={`flex items-center justify-between px-3 py-1.5 rounded-md text-xs ${e.user_id === currentUserId ? 'bg-primary/5 font-semibold' : 'bg-secondary/50'}`}>
+                <span className="truncate flex-1">{e.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${getColor(e.points)}`}>
+                    {e.home_score_pred}×{e.away_score_pred}
+                  </span>
+                  {e.points !== null && (
+                    <span className="text-[10px] font-bold tabular-nums w-8 text-right">
+                      {e.points > 0 ? '+' : ''}{e.points}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function PredictionsPage() {
@@ -144,6 +231,12 @@ export default function PredictionsPage() {
   const [saving, setSaving] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('TODOS');
   const [drafts, setDrafts] = useState<Map<string, { home: number; away: number }>>(new Map());
+  const [, forceUpdate] = useState(0);
+
+  // All predictions & profiles for expandable view
+  const [allPredictions, setAllPredictions] = useState<AllPrediction[]>([]);
+  const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
+  const [allScores, setAllScores] = useState<{ user_id: string; match_id: string; points: number }[]>([]);
 
   useEffect(() => { fetchData(); }, [user]);
 
@@ -151,7 +244,8 @@ export default function PredictionsPage() {
     const channel = supabase
       .channel('matches-realtime-pred')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' }, () => fetchMatches())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => fetchScores())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => { fetchScores(); fetchAllScores(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, () => fetchAllPredictions())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
@@ -171,12 +265,25 @@ export default function PredictionsPage() {
     }
   };
 
+  const fetchAllPredictions = async () => {
+    const { data } = await supabase.from('predictions').select('user_id, match_id, home_score_pred, away_score_pred');
+    if (data) setAllPredictions(data);
+  };
+
+  const fetchAllScores = async () => {
+    const { data } = await supabase.from('scores').select('user_id, match_id, points');
+    if (data) setAllScores(data);
+  };
+
   const fetchData = async () => {
     if (!user) return;
-    const [matchRes, predRes, scoreRes] = await Promise.all([
+    const [matchRes, predRes, scoreRes, allPredRes, profilesRes, allScoresRes] = await Promise.all([
       supabase.from('matches').select('*').order('match_datetime', { ascending: true }),
       supabase.from('predictions').select('*').eq('user_id', user.id),
       supabase.from('scores').select('*').eq('user_id', user.id),
+      supabase.from('predictions').select('user_id, match_id, home_score_pred, away_score_pred'),
+      supabase.from('profiles').select('user_id, name').eq('is_approved', true),
+      supabase.from('scores').select('user_id, match_id, points'),
     ]);
 
     if (matchRes.data) setMatches(matchRes.data as Match[]);
@@ -190,12 +297,20 @@ export default function PredictionsPage() {
       scoreRes.data.forEach(s => map.set(s.match_id, s));
       setScores(map);
     }
+    if (allPredRes.data) setAllPredictions(allPredRes.data);
+    if (profilesRes.data) setAllProfiles(profilesRes.data);
+    if (allScoresRes.data) setAllScores(allScoresRes.data);
     setLoading(false);
   };
 
-  const isLocked = (match: Match) => {
-    return match.is_finished || new Date(match.match_datetime).getTime() - 30 * 60 * 1000 <= serverNow();
-  };
+  const isLocked = useCallback((match: Match) => {
+    return match.is_finished || match.is_started || new Date(match.match_datetime).getTime() - 30 * 60 * 1000 <= serverNow();
+  }, [serverNow]);
+
+  // Force re-render to update locked state when timers expire
+  const handleTimerExpired = useCallback(() => {
+    forceUpdate(n => n + 1);
+  }, []);
 
   const filteredMatches = useMemo(() => {
     let filtered = matches.filter(m => {
@@ -211,7 +326,7 @@ export default function PredictionsPage() {
       filtered = [...filtered].sort((a, b) => a.group_name.localeCompare(b.group_name) || new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime());
     }
     return filtered;
-  }, [matches, filter, predictions]);
+  }, [matches, filter, predictions, isLocked]);
 
   const getDraft = (matchId: string) => {
     const draft = drafts.get(matchId);
@@ -310,13 +425,14 @@ export default function PredictionsPage() {
               const draft = getDraft(match.id);
               const changed = hasDraftChanged(match.id);
               const partialPoints = !match.is_finished ? getPartialPoints(match, pred) : null;
+              const showExpandable = locked && !match.is_finished;
 
               return (
                 <div
                   key={match.id}
                   className={`glass-card p-4 animate-reveal-up ${
                     match.is_finished
-                      ? 'border-l-4 border-l-foreground/30 bg-muted/40'
+                      ? 'border-l-4 border-l-foreground/30 bg-muted/40 opacity-80'
                       : match.is_started
                         ? 'border-l-4 border-l-green-500/50'
                         : ''
@@ -332,8 +448,8 @@ export default function PredictionsPage() {
                       {match.is_finished && score && <ScoreBadge points={score.points} />}
                       {!match.is_finished && partialPoints !== null && <ScoreBadge points={partialPoints} />}
                       <MatchStatusBadge match={match} serverNow={serverNow} />
-                      {!match.is_finished && !match.is_started && (
-                        <CountdownTimer datetime={match.match_datetime} serverNow={serverNow} />
+                      {!match.is_finished && !match.is_started && !locked && (
+                        <CountdownTimer datetime={match.match_datetime} serverNow={serverNow} onExpired={handleTimerExpired} />
                       )}
                     </div>
                   </div>
@@ -350,6 +466,10 @@ export default function PredictionsPage() {
                           <span className="text-muted-foreground text-xs">×</span>
                           <span className="font-bold tabular-nums">{match.away_score ?? '-'}</span>
                         </div>
+                      ) : locked ? (
+                        <div className="flex items-center gap-1 bg-foreground/5 px-3 py-1.5 rounded-lg">
+                          <span className="text-muted-foreground text-xs">—</span>
+                        </div>
                       ) : (
                         <>
                           <ScoreInput value={draft.home} onChange={v => setDraft(match.id, v, draft.away)} disabled={locked} />
@@ -363,8 +483,8 @@ export default function PredictionsPage() {
                     </div>
                   </div>
 
-                  {/* Prediction indicator + Save */}
-                  {!match.is_finished && !match.is_started && (
+                  {/* Prediction indicator + Save (only for unlocked, not started/finished) */}
+                  {!match.is_finished && !match.is_started && !locked && (
                     <div className="flex items-center justify-between mt-3">
                       {pred && !changed ? (
                         <span className="text-xs text-primary flex items-center gap-1">
@@ -375,7 +495,7 @@ export default function PredictionsPage() {
                           {pred ? 'Palpite alterado' : 'Sem palpite'}
                         </span>
                       )}
-                      {!locked && (changed || !pred) && (
+                      {(changed || !pred) && (
                         <Button
                           size="sm"
                           onClick={() => savePrediction(match)}
@@ -388,11 +508,22 @@ export default function PredictionsPage() {
                     </div>
                   )}
 
-                  {/* Show user's prediction for finished/started match */}
-                  {(match.is_finished || match.is_started) && pred && (
+                  {/* Show user's prediction for finished match */}
+                  {match.is_finished && pred && (
                     <p className="text-xs text-muted-foreground mt-2">
                       Seu palpite: {pred.home_score_pred} × {pred.away_score_pred}
                     </p>
+                  )}
+
+                  {/* Expandable predictions for locked/in-progress matches */}
+                  {(showExpandable || match.is_finished) && user && (
+                    <ExpandablePredictions
+                      match={match}
+                      currentUserId={user.id}
+                      allPredictions={allPredictions}
+                      allProfiles={allProfiles}
+                      allScores={allScores}
+                    />
                   )}
                 </div>
               );

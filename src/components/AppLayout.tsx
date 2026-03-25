@@ -21,23 +21,46 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   const fetchRank = async () => {
     if (!user) return;
-    // Get all approved profiles
     const { data: profiles } = await supabase.from('profiles').select('user_id').eq('is_approved', true);
     if (!profiles) return;
 
-    // Get all scores
     const { data: allScores } = await supabase.from('scores').select('user_id, points');
     if (!allScores) return;
 
-    // Aggregate
-    const totals = new Map<string, number>();
-    profiles.forEach(p => totals.set(p.user_id, 0));
-    allScores.forEach(s => totals.set(s.user_id, (totals.get(s.user_id) ?? 0) + s.points));
+    // Aggregate totals + tiebreakers
+    const userMap = new Map<string, { total: number; exact: number; partial: number; negative: number }>();
+    profiles.forEach(p => userMap.set(p.user_id, { total: 0, exact: 0, partial: 0, negative: 0 }));
+    allScores.forEach(s => {
+      const entry = userMap.get(s.user_id);
+      if (!entry) return;
+      entry.total += s.points;
+      if (s.points === 5) entry.exact++;
+      else if (s.points === 2) entry.partial++;
+      else if (s.points === -1) entry.negative++;
+    });
 
-    const sorted = Array.from(totals.entries()).sort((a, b) => b[1] - a[1]);
-    const idx = sorted.findIndex(([uid]) => uid === user.id);
+    const sorted = Array.from(userMap.entries())
+      .map(([uid, e]) => ({ uid, ...e }))
+      .sort((a, b) => {
+        if (b.total !== a.total) return b.total - a.total;
+        if (b.exact !== a.exact) return b.exact - a.exact;
+        if (b.partial !== a.partial) return b.partial - a.partial;
+        return a.negative - b.negative;
+      });
+
+    // Assign positions with ties
+    const positions: number[] = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i].total === sorted[i-1].total && sorted[i].exact === sorted[i-1].exact && sorted[i].partial === sorted[i-1].partial && sorted[i].negative === sorted[i-1].negative) {
+        positions.push(positions[i - 1]);
+      } else {
+        positions.push(i + 1);
+      }
+    }
+
+    const idx = sorted.findIndex(e => e.uid === user.id);
     if (idx !== -1) {
-      setRank({ position: idx + 1, points: sorted[idx][1] });
+      setRank({ position: positions[idx], points: sorted[idx].total });
     }
   };
 

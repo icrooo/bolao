@@ -4,7 +4,11 @@ import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Plus, Trophy, Trash2, Pencil, X, Play } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Loader2, Plus, Trophy, Trash2, Pencil, X, Play, Minus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -24,10 +28,10 @@ export default function AdminPage() {
   const [showAddMatch, setShowAddMatch] = useState(false);
   const [newMatch, setNewMatch] = useState({ home_team: '', away_team: '', match_datetime: '', group_name: '' });
   const [finishingMatch, setFinishingMatch] = useState<string | null>(null);
+  const [confirmFinish, setConfirmFinish] = useState<string | null>(null);
   const [startingMatch, setStartingMatch] = useState<string | null>(null);
   const [editingMatch, setEditingMatch] = useState<string | null>(null);
   const [editData, setEditData] = useState({ home_team: '', away_team: '', match_datetime: '', group_name: '' });
-  const [scoreDrafts, setScoreDrafts] = useState<Map<string, { home: string; away: string }>>(new Map());
   const [updatingScore, setUpdatingScore] = useState<string | null>(null);
 
   useEffect(() => { fetchData(); }, []);
@@ -51,7 +55,6 @@ export default function AdminPage() {
 
   const deleteUser = async (profile: Profile) => {
     if (!window.confirm(`Tem certeza que deseja excluir o usuário "${profile.name}"? Todos os seus palpites e pontuações serão removidos.`)) return;
-    // Delete scores, predictions, user_roles, then profile
     await supabase.from('scores').delete().eq('user_id', profile.user_id);
     await supabase.from('predictions').delete().eq('user_id', profile.user_id);
     await supabase.from('user_roles').delete().eq('user_id', profile.user_id);
@@ -104,48 +107,22 @@ export default function AdminPage() {
     fetchData();
   };
 
-  const getScoreDraft = (m: Match) => {
-    const draft = scoreDrafts.get(m.id);
-    return draft ?? { home: m.home_score?.toString() ?? '', away: m.away_score?.toString() ?? '' };
-  };
-
-  const setScoreDraft = (matchId: string, field: 'home' | 'away', value: string) => {
-    if (value !== '' && !/^\d+$/.test(value)) return;
-    setScoreDrafts(prev => {
-      const n = new Map(prev);
-      const current = n.get(matchId) ?? { home: '', away: '' };
-      n.set(matchId, { ...current, [field]: value });
-      return n;
-    });
-  };
-
-  const updateScore = async (matchId: string) => {
-    const draft = getScoreDraft(matches.find(m => m.id === matchId)!);
-    const homeVal = draft.home === '' ? null : parseInt(draft.home);
-    const awayVal = draft.away === '' ? null : parseInt(draft.away);
+  const adjustScore = async (matchId: string, field: 'home_score' | 'away_score', delta: number) => {
+    const match = matches.find(m => m.id === matchId);
+    if (!match) return;
+    const current = match[field] ?? 0;
+    const newVal = Math.max(0, current + delta);
+    const otherField = field === 'home_score' ? 'away_score' : 'home_score';
 
     setUpdatingScore(matchId);
+    const updatePayload: any = { [field]: newVal };
+    if (match[otherField] === null) updatePayload[otherField] = 0;
 
-    const { error } = await supabase.from('matches').update({
-      home_score: homeVal,
-      away_score: awayVal,
-    }).eq('id', matchId);
+    const { error } = await supabase.from('matches').update(updatePayload).eq('id', matchId);
+    if (error) { toast.error(error.message); setUpdatingScore(null); return; }
 
-    if (error) {
-      toast.error(error.message);
-      setUpdatingScore(null);
-      return;
-    }
-
-    if (homeVal !== null && awayVal !== null) {
-      await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
-    } else {
-      await supabase.from('scores').delete().eq('match_id', matchId);
-    }
-
-    toast.success('Placar atualizado!');
+    await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
     setUpdatingScore(null);
-    setScoreDrafts(prev => { const n = new Map(prev); n.delete(matchId); return n; });
     fetchData();
   };
 
@@ -184,6 +161,7 @@ export default function AdminPage() {
     await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
     toast.success('Jogo encerrado!');
     setFinishingMatch(null);
+    setConfirmFinish(null);
     fetchData();
   };
 
@@ -313,29 +291,57 @@ export default function AdminPage() {
                   </p>
                 ) : (
                   <>
-                    {/* Score input fields */}
+                    {/* Score +/- controls */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex-1 text-right">
                         <p className="text-sm font-medium truncate">{m.home_team}</p>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Input
-                          type="text"
-                          inputMode="numeric"
-                          value={getScoreDraft(m).home}
-                          onChange={e => setScoreDraft(m.id, 'home', e.target.value)}
-                          className="w-12 h-9 text-center font-bold tabular-nums p-0"
-                          placeholder="-"
-                        />
-                        <span className="text-muted-foreground text-xs mx-1">×</span>
-                        <Input
-                          type="text"
-                          inputMode="numeric"
-                          value={getScoreDraft(m).away}
-                          onChange={e => setScoreDraft(m.id, 'away', e.target.value)}
-                          className="w-12 h-9 text-center font-bold tabular-nums p-0"
-                          placeholder="-"
-                        />
+                        {m.is_started ? (
+                          <>
+                            <button
+                              disabled={updatingScore === m.id || (m.home_score ?? 0) <= 0}
+                              onClick={() => adjustScore(m.id, 'home_score', -1)}
+                              className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="w-6 text-center font-bold tabular-nums">{m.home_score ?? 0}</span>
+                            <button
+                              disabled={updatingScore === m.id}
+                              onClick={() => adjustScore(m.id, 'home_score', 1)}
+                              className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
+                      </div>
+                      <span className="text-muted-foreground text-xs mx-1">×</span>
+                      <div className="flex items-center gap-1">
+                        {m.is_started ? (
+                          <>
+                            <button
+                              disabled={updatingScore === m.id || (m.away_score ?? 0) <= 0}
+                              onClick={() => adjustScore(m.id, 'away_score', -1)}
+                              className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="w-6 text-center font-bold tabular-nums">{m.away_score ?? 0}</span>
+                            <button
+                              disabled={updatingScore === m.id}
+                              onClick={() => adjustScore(m.id, 'away_score', 1)}
+                              className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-medium truncate">{m.away_team}</p>
@@ -350,28 +356,18 @@ export default function AdminPage() {
                           disabled={startingMatch === m.id}
                           className="flex-1 text-xs active:scale-95 bg-green-600 hover:bg-green-700"
                         >
-                          {startingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Play className="h-3 w-3 mr-1" /> Iniciar Jogo</>}
+                          {startingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Play className="h-3 w-3 mr-1" /> Iniciar jogo</>}
                         </Button>
                       ) : (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={() => updateScore(m.id)}
-                            disabled={updatingScore === m.id}
-                            className="flex-1 text-xs active:scale-95"
-                          >
-                            {updatingScore === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '⚽ Atualizar Placar'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => finishMatch(m.id)}
-                            disabled={finishingMatch === m.id}
-                            className="flex-1 text-xs active:scale-95"
-                          >
-                            {finishingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '🏁 Encerrar Jogo'}
-                          </Button>
-                        </>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setConfirmFinish(m.id)}
+                          disabled={finishingMatch === m.id}
+                          className="flex-1 text-xs active:scale-95"
+                        >
+                          {finishingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '🏁 Encerrar'}
+                        </Button>
                       )}
                     </div>
                   </>
@@ -381,6 +377,24 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      {/* Finish confirmation dialog */}
+      <AlertDialog open={!!confirmFinish} onOpenChange={(open) => { if (!open) setConfirmFinish(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Encerrar jogo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja encerrar este jogo? A pontuação final será computada e não poderá ser alterada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmFinish && finishMatch(confirmFinish)}>
+              Encerrar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
