@@ -13,6 +13,7 @@ type RankingEntry = {
   exact_count: number;
   partial_count: number;
   negative_count: number;
+  position: number;
 };
 
 export default function RankingPage() {
@@ -22,41 +23,31 @@ export default function RankingPage() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  useEffect(() => {
-    fetchRanking();
-  }, [tab, selectedDate]);
+  useEffect(() => { fetchRanking(); }, [tab, selectedDate]);
 
-  // Realtime subscription for live ranking updates
   useEffect(() => {
     const channel = supabase
       .channel('scores-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' },
-        () => fetchRanking()
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => fetchRanking())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [tab, selectedDate]);
 
   const fetchRanking = async () => {
     setLoading(true);
-
-    // Get all profiles
     const { data: profiles } = await supabase.from('profiles').select('user_id, name').eq('is_approved', true);
     if (!profiles) { setLoading(false); return; }
 
-    // Get scores, optionally filtered by date
     let scoresQuery = supabase.from('scores').select('user_id, match_id, points');
 
     if (tab === 'dia') {
-      // Get matches for selected date
       const dayStart = new Date(selectedDate);
       dayStart.setHours(0, 0, 0, 0);
       const dayEnd = new Date(selectedDate);
       dayEnd.setHours(23, 59, 59, 999);
 
       const { data: dayMatches } = await supabase
-        .from('matches')
-        .select('id')
+        .from('matches').select('id')
         .gte('match_datetime', dayStart.toISOString())
         .lte('match_datetime', dayEnd.toISOString());
 
@@ -65,14 +56,12 @@ export default function RankingPage() {
         setLoading(false);
         return;
       }
-
       scoresQuery = scoresQuery.in('match_id', dayMatches.map(m => m.id));
     }
 
     const { data: scoresData } = await scoresQuery;
     if (!scoresData) { setLoading(false); return; }
 
-    // Aggregate per user
     const userMap = new Map<string, RankingEntry>();
     profiles.forEach(p => {
       userMap.set(p.user_id, {
@@ -82,6 +71,7 @@ export default function RankingPage() {
         exact_count: 0,
         partial_count: 0,
         negative_count: 0,
+        position: 0,
       });
     });
 
@@ -94,7 +84,6 @@ export default function RankingPage() {
       else if (s.points === -1) entry.negative_count++;
     });
 
-    // Sort by criteria
     const sorted = Array.from(userMap.values()).sort((a, b) => {
       if (b.total_points !== a.total_points) return b.total_points - a.total_points;
       if (b.exact_count !== a.exact_count) return b.exact_count - a.exact_count;
@@ -102,21 +91,39 @@ export default function RankingPage() {
       return a.negative_count - b.negative_count;
     });
 
+    // Assign positions with ties
+    let currentPos = 1;
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0) {
+        const prev = sorted[i - 1];
+        const curr = sorted[i];
+        if (curr.total_points === prev.total_points &&
+            curr.exact_count === prev.exact_count &&
+            curr.partial_count === prev.partial_count &&
+            curr.negative_count === prev.negative_count) {
+          curr.position = prev.position;
+        } else {
+          curr.position = i + 1;
+        }
+      } else {
+        sorted[i].position = 1;
+      }
+    }
+
     setRanking(sorted);
     setLoading(false);
   };
 
   const getMedalEmoji = (pos: number) => {
-    if (pos === 0) return '🥇';
-    if (pos === 1) return '🥈';
-    if (pos === 2) return '🥉';
+    if (pos === 1) return '🥇';
+    if (pos === 2) return '🥈';
+    if (pos === 3) return '🥉';
     return null;
   };
 
   return (
     <AppLayout>
       <div className="space-y-4">
-        {/* Tabs */}
         <div className="flex gap-1 bg-secondary rounded-lg p-1">
           {(['geral', 'dia'] as const).map(t => (
             <button
@@ -131,28 +138,20 @@ export default function RankingPage() {
           ))}
         </div>
 
-        {/* Date picker for daily */}
         {tab === 'dia' && (
           <div className="flex items-center justify-center gap-4">
-            <button
-              onClick={() => setSelectedDate(d => subDays(d, 1))}
-              className="p-1.5 rounded-lg hover:bg-secondary active:scale-95 transition-all"
-            >
+            <button onClick={() => setSelectedDate(d => subDays(d, 1))} className="p-1.5 rounded-lg hover:bg-secondary active:scale-95 transition-all">
               <ChevronLeft className="h-5 w-5" />
             </button>
             <span className="text-sm font-medium min-w-[120px] text-center">
               {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}
             </span>
-            <button
-              onClick={() => setSelectedDate(d => addDays(d, 1))}
-              className="p-1.5 rounded-lg hover:bg-secondary active:scale-95 transition-all"
-            >
+            <button onClick={() => setSelectedDate(d => addDays(d, 1))} className="p-1.5 rounded-lg hover:bg-secondary active:scale-95 transition-all">
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
         )}
 
-        {/* Ranking List */}
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -164,7 +163,7 @@ export default function RankingPage() {
         ) : (
           <div className="space-y-2">
             {ranking.map((entry, i) => {
-              const medal = getMedalEmoji(i);
+              const medal = getMedalEmoji(entry.position);
               return (
                 <div
                   key={entry.user_id}
@@ -177,7 +176,7 @@ export default function RankingPage() {
                     {medal ? (
                       <span className="text-sm">{medal}</span>
                     ) : (
-                      <span className="text-xs font-bold text-muted-foreground">{i + 1}</span>
+                      <span className="text-xs font-bold text-muted-foreground">{entry.position}</span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
