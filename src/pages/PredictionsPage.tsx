@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useServerTime } from '@/hooks/useServerTime';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Loader2, Check, Lock, Minus, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, isToday, isTomorrow, differenceInSeconds } from 'date-fns';
@@ -18,6 +19,7 @@ type Match = {
   home_score: number | null;
   away_score: number | null;
   is_finished: boolean;
+  is_started: boolean;
 };
 
 type Prediction = {
@@ -43,6 +45,32 @@ function ScoreBadge({ points }: { points: number }) {
   );
 }
 
+function MatchStatusBadge({ match, serverNow }: { match: Match; serverNow: () => number }) {
+  if (match.is_finished) {
+    return (
+      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-foreground/10 text-foreground">
+        Encerrado
+      </span>
+    );
+  }
+  if (match.is_started) {
+    return (
+      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-500/15 text-green-600">
+        Em andamento
+      </span>
+    );
+  }
+  const lockTime = new Date(match.match_datetime).getTime() - 30 * 60 * 1000;
+  if (serverNow() >= lockTime) {
+    return (
+      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-destructive/15 text-destructive flex items-center gap-1">
+        <Lock className="h-3 w-3" /> Bloqueado
+      </span>
+    );
+  }
+  return null;
+}
+
 function CountdownTimer({ datetime, serverNow }: { datetime: string; serverNow: () => number }) {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const lockTime = new Date(new Date(datetime).getTime() - 30 * 60 * 1000);
@@ -54,7 +82,7 @@ function CountdownTimer({ datetime, serverNow }: { datetime: string; serverNow: 
     return () => clearInterval(interval);
   }, [datetime, serverNow]);
 
-  if (secondsLeft <= 0) return <span className="text-xs text-destructive flex items-center gap-1"><Lock className="h-3 w-3" /> Bloqueado</span>;
+  if (secondsLeft <= 0) return null;
 
   const d = Math.floor(secondsLeft / 86400);
   const h = Math.floor((secondsLeft % 86400) / 3600);
@@ -94,11 +122,15 @@ function ScoreInput({ value, onChange, disabled }: { value: number; onChange: (v
 
 /** Calculate points for a prediction given actual scores */
 function calcPoints(pred: Prediction, homeScore: number, awayScore: number): number {
+  // 1. Exact score
   if (pred.home_score_pred === homeScore && pred.away_score_pred === awayScore) return 5;
-  const predDiff = pred.home_score_pred - pred.away_score_pred;
-  const actualDiff = homeScore - awayScore;
-  if ((predDiff > 0 && actualDiff > 0) || (predDiff < 0 && actualDiff < 0) || (predDiff === 0 && actualDiff === 0)) return 2;
-  if ((predDiff > 0 && actualDiff < 0) || (predDiff < 0 && actualDiff > 0)) return -1;
+  // 2. Inverse score (swapped) — priority over tendency
+  if (pred.home_score_pred === awayScore && pred.away_score_pred === homeScore) return -1;
+  // 3. Correct tendency
+  if ((pred.home_score_pred > pred.away_score_pred && homeScore > awayScore) ||
+      (pred.home_score_pred < pred.away_score_pred && homeScore < awayScore) ||
+      (pred.home_score_pred === pred.away_score_pred && homeScore === awayScore)) return 2;
+  // 4. Otherwise
   return 0;
 }
 
@@ -113,27 +145,20 @@ export default function PredictionsPage() {
   const [filter, setFilter] = useState<string>('TODOS');
   const [drafts, setDrafts] = useState<Map<string, { home: number; away: number }>>(new Map());
 
-  useEffect(() => {
-    fetchData();
-  }, [user]);
+  useEffect(() => { fetchData(); }, [user]);
 
-  // Realtime: listen for match score changes to show partial points
   useEffect(() => {
     const channel = supabase
       .channel('matches-realtime-pred')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' }, () => {
-        fetchMatches();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => {
-        fetchScores();
-      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' }, () => fetchMatches())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => fetchScores())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   const fetchMatches = async () => {
     const { data } = await supabase.from('matches').select('*').order('match_datetime', { ascending: true });
-    if (data) setMatches(data);
+    if (data) setMatches(data as Match[]);
   };
 
   const fetchScores = async () => {
@@ -154,7 +179,7 @@ export default function PredictionsPage() {
       supabase.from('scores').select('*').eq('user_id', user.id),
     ]);
 
-    if (matchRes.data) setMatches(matchRes.data);
+    if (matchRes.data) setMatches(matchRes.data as Match[]);
     if (predRes.data) {
       const map = new Map<string, Prediction>();
       predRes.data.forEach(p => map.set(p.match_id, p));
@@ -235,7 +260,6 @@ export default function PredictionsPage() {
     return draft.home !== pred.home_score_pred || draft.away !== pred.away_score_pred;
   };
 
-  /** Get partial points for an ongoing match */
   const getPartialPoints = (match: Match, pred: Prediction | undefined) => {
     if (!pred) return null;
     if (match.home_score === null || match.away_score === null) return null;
@@ -291,7 +315,11 @@ export default function PredictionsPage() {
                 <div
                   key={match.id}
                   className={`glass-card p-4 animate-reveal-up ${
-                    match.is_finished ? 'border-l-4 border-l-primary/40 opacity-80' : ''
+                    match.is_finished
+                      ? 'border-l-4 border-l-foreground/30 bg-muted/40'
+                      : match.is_started
+                        ? 'border-l-4 border-l-green-500/50'
+                        : ''
                   }`}
                   style={{ animationDelay: `${Math.min(i * 60, 300)}ms` }}
                 >
@@ -302,13 +330,11 @@ export default function PredictionsPage() {
                     </span>
                     <div className="flex items-center gap-2">
                       {match.is_finished && score && <ScoreBadge points={score.points} />}
-                      {match.is_finished && !score && (
-                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-                          Encerrado
-                        </span>
-                      )}
                       {!match.is_finished && partialPoints !== null && <ScoreBadge points={partialPoints} />}
-                      {!match.is_finished && <CountdownTimer datetime={match.match_datetime} serverNow={serverNow} />}
+                      <MatchStatusBadge match={match} serverNow={serverNow} />
+                      {!match.is_finished && !match.is_started && (
+                        <CountdownTimer datetime={match.match_datetime} serverNow={serverNow} />
+                      )}
                     </div>
                   </div>
 
@@ -318,11 +344,11 @@ export default function PredictionsPage() {
                       <p className="font-medium text-sm">{match.home_team}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      {match.is_finished ? (
+                      {match.is_finished || match.is_started ? (
                         <div className="flex items-center gap-1 bg-foreground/5 px-3 py-1.5 rounded-lg">
-                          <span className="font-bold tabular-nums">{match.home_score}</span>
+                          <span className="font-bold tabular-nums">{match.home_score ?? '-'}</span>
                           <span className="text-muted-foreground text-xs">×</span>
-                          <span className="font-bold tabular-nums">{match.away_score}</span>
+                          <span className="font-bold tabular-nums">{match.away_score ?? '-'}</span>
                         </div>
                       ) : (
                         <>
@@ -338,7 +364,7 @@ export default function PredictionsPage() {
                   </div>
 
                   {/* Prediction indicator + Save */}
-                  {!match.is_finished && (
+                  {!match.is_finished && !match.is_started && (
                     <div className="flex items-center justify-between mt-3">
                       {pred && !changed ? (
                         <span className="text-xs text-primary flex items-center gap-1">
@@ -362,8 +388,8 @@ export default function PredictionsPage() {
                     </div>
                   )}
 
-                  {/* Show user's prediction for finished match */}
-                  {match.is_finished && pred && (
+                  {/* Show user's prediction for finished/started match */}
+                  {(match.is_finished || match.is_started) && pred && (
                     <p className="text-xs text-muted-foreground mt-2">
                       Seu palpite: {pred.home_score_pred} × {pred.away_score_pred}
                     </p>

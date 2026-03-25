@@ -4,7 +4,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Plus, Trophy, Trash2, Pencil, X } from 'lucide-react';
+import { Loader2, Plus, Trophy, Trash2, Pencil, X, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -12,7 +12,8 @@ import { ptBR } from 'date-fns/locale';
 type Profile = { id: string; user_id: string; name: string; email: string | null; is_approved: boolean; created_at: string };
 type Match = {
   id: string; home_team: string; away_team: string; match_datetime: string;
-  group_name: string; home_score: number | null; away_score: number | null; is_finished: boolean;
+  group_name: string; home_score: number | null; away_score: number | null;
+  is_finished: boolean; is_started: boolean;
 };
 
 export default function AdminPage() {
@@ -23,9 +24,9 @@ export default function AdminPage() {
   const [showAddMatch, setShowAddMatch] = useState(false);
   const [newMatch, setNewMatch] = useState({ home_team: '', away_team: '', match_datetime: '', group_name: '' });
   const [finishingMatch, setFinishingMatch] = useState<string | null>(null);
+  const [startingMatch, setStartingMatch] = useState<string | null>(null);
   const [editingMatch, setEditingMatch] = useState<string | null>(null);
   const [editData, setEditData] = useState({ home_team: '', away_team: '', match_datetime: '', group_name: '' });
-  // Score drafts for input fields
   const [scoreDrafts, setScoreDrafts] = useState<Map<string, { home: string; away: string }>>(new Map());
   const [updatingScore, setUpdatingScore] = useState<string | null>(null);
 
@@ -37,7 +38,7 @@ export default function AdminPage() {
       supabase.from('matches').select('*').order('match_datetime', { ascending: true }),
     ]);
     if (profRes.data) setProfiles(profRes.data as Profile[]);
-    if (matchRes.data) setMatches(matchRes.data);
+    if (matchRes.data) setMatches(matchRes.data as Match[]);
     setLoading(false);
   };
 
@@ -46,6 +47,18 @@ export default function AdminPage() {
     if (error) { toast.error(error.message); return; }
     toast.success(approve ? 'Usuário aprovado!' : 'Usuário bloqueado.');
     setProfiles(prev => prev.map(p => p.user_id === userId ? { ...p, is_approved: approve } : p));
+  };
+
+  const deleteUser = async (profile: Profile) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o usuário "${profile.name}"? Todos os seus palpites e pontuações serão removidos.`)) return;
+    // Delete scores, predictions, user_roles, then profile
+    await supabase.from('scores').delete().eq('user_id', profile.user_id);
+    await supabase.from('predictions').delete().eq('user_id', profile.user_id);
+    await supabase.from('user_roles').delete().eq('user_id', profile.user_id);
+    const { error } = await supabase.from('profiles').delete().eq('user_id', profile.user_id);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Usuário excluído!');
+    setProfiles(prev => prev.filter(p => p.user_id !== profile.user_id));
   };
 
   const addMatch = async () => {
@@ -97,7 +110,6 @@ export default function AdminPage() {
   };
 
   const setScoreDraft = (matchId: string, field: 'home' | 'away', value: string) => {
-    // Allow only digits
     if (value !== '' && !/^\d+$/.test(value)) return;
     setScoreDrafts(prev => {
       const n = new Map(prev);
@@ -125,18 +137,30 @@ export default function AdminPage() {
       return;
     }
 
-    // Recalculate scores only if both values are set
     if (homeVal !== null && awayVal !== null) {
       await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
     } else {
-      // If either is null, clear existing scores for this match
       await supabase.from('scores').delete().eq('match_id', matchId);
     }
 
     toast.success('Placar atualizado!');
     setUpdatingScore(null);
-    // Clear draft
     setScoreDrafts(prev => { const n = new Map(prev); n.delete(matchId); return n; });
+    fetchData();
+  };
+
+  const startMatch = async (matchId: string) => {
+    setStartingMatch(matchId);
+    const { error } = await supabase.from('matches').update({
+      is_started: true,
+      home_score: 0,
+      away_score: 0,
+    }).eq('id', matchId);
+    if (error) { toast.error(error.message); setStartingMatch(null); return; }
+
+    await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
+    toast.success('Jogo iniciado!');
+    setStartingMatch(null);
     fetchData();
   };
 
@@ -199,10 +223,18 @@ export default function AdminPage() {
                     {p.email ?? 'Sem e-mail'} · {format(new Date(p.created_at), "dd/MM/yyyy", { locale: ptBR })}
                   </p>
                 </div>
-                <Switch
-                  checked={p.is_approved}
-                  onCheckedChange={(checked) => approveUser(p.user_id, checked)}
-                />
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={p.is_approved}
+                    onCheckedChange={(checked) => approveUser(p.user_id, checked)}
+                  />
+                  <button
+                    onClick={() => deleteUser(p)}
+                    className="text-destructive hover:text-destructive/80 active:scale-90 transition-all"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -236,8 +268,13 @@ export default function AdminPage() {
                   </span>
                   <div className="flex items-center gap-2">
                     {m.is_finished && (
-                      <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                      <span className="text-[10px] bg-foreground/10 text-foreground px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
                         <Trophy className="h-3 w-3" /> Encerrado
+                      </span>
+                    )}
+                    {m.is_started && !m.is_finished && (
+                      <span className="text-[10px] bg-green-500/10 text-green-600 px-2 py-0.5 rounded-full font-medium">
+                        Em andamento
                       </span>
                     )}
                     {!m.is_finished && (
@@ -306,23 +343,36 @@ export default function AdminPage() {
                     </div>
 
                     <div className="flex gap-2 mt-3">
-                      <Button
-                        size="sm"
-                        onClick={() => updateScore(m.id)}
-                        disabled={updatingScore === m.id}
-                        className="flex-1 text-xs active:scale-95"
-                      >
-                        {updatingScore === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '⚽ Atualizar Placar'}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => finishMatch(m.id)}
-                        disabled={finishingMatch === m.id}
-                        className="flex-1 text-xs active:scale-95"
-                      >
-                        {finishingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '🏁 Encerrar Jogo'}
-                      </Button>
+                      {!m.is_started ? (
+                        <Button
+                          size="sm"
+                          onClick={() => startMatch(m.id)}
+                          disabled={startingMatch === m.id}
+                          className="flex-1 text-xs active:scale-95 bg-green-600 hover:bg-green-700"
+                        >
+                          {startingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Play className="h-3 w-3 mr-1" /> Iniciar Jogo</>}
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => updateScore(m.id)}
+                            disabled={updatingScore === m.id}
+                            className="flex-1 text-xs active:scale-95"
+                          >
+                            {updatingScore === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '⚽ Atualizar Placar'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => finishMatch(m.id)}
+                            disabled={finishingMatch === m.id}
+                            className="flex-1 text-xs active:scale-95"
+                          >
+                            {finishingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '🏁 Encerrar Jogo'}
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </>
                 )}
