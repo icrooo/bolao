@@ -24,6 +24,7 @@ export type Database = {
           home_team: string
           id: string
           is_finished: boolean
+          is_started: boolean
           match_datetime: string
         }
         Insert: {
@@ -35,6 +36,7 @@ export type Database = {
           home_team: string
           id?: string
           is_finished?: boolean
+          is_started?: boolean
           match_datetime: string
         }
         Update: {
@@ -46,6 +48,7 @@ export type Database = {
           home_team?: string
           id?: string
           is_finished?: boolean
+          is_started?: boolean
           match_datetime?: string
         }
         Relationships: []
