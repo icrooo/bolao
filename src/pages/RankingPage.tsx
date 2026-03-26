@@ -39,6 +39,9 @@ export default function RankingPage() {
     const { data: profiles } = await supabase.from('profiles').select('user_id, name').eq('is_approved', true);
     if (!profiles) { setLoading(false); return; }
 
+    // Get finished matches for "previous ranking" calculation
+    const { data: finishedMatches } = await supabase.from('matches').select('id, match_datetime').eq('is_finished', true).order('match_datetime', { ascending: false });
+
     let scoresQuery = supabase.from('scores').select('user_id, match_id, points');
 
     if (tab === 'dia') {
@@ -63,55 +66,64 @@ export default function RankingPage() {
     const { data: scoresData } = await scoresQuery;
     if (!scoresData) { setLoading(false); return; }
 
-    const userMap = new Map<string, RankingEntry>();
-    profiles.forEach(p => {
-      userMap.set(p.user_id, {
-        user_id: p.user_id,
-        name: p.name,
-        total_points: 0,
-        exact_count: 0,
-        partial_count: 0,
-        negative_count: 0,
-        position: 0,
+    const buildRanking = (scores: typeof scoresData) => {
+      const userMap = new Map<string, RankingEntry>();
+      profiles.forEach(p => {
+        userMap.set(p.user_id, {
+          user_id: p.user_id, name: p.name,
+          total_points: 0, exact_count: 0, partial_count: 0, negative_count: 0,
+          position: 0, positionChange: null,
+        });
       });
-    });
-
-    scoresData.forEach(s => {
-      const entry = userMap.get(s.user_id);
-      if (!entry) return;
-      entry.total_points += s.points;
-      if (s.points === 5) entry.exact_count++;
-      else if (s.points === 2) entry.partial_count++;
-      else if (s.points === -1) entry.negative_count++;
-    });
-
-    const sorted = Array.from(userMap.values()).sort((a, b) => {
-      if (b.total_points !== a.total_points) return b.total_points - a.total_points;
-      if (b.exact_count !== a.exact_count) return b.exact_count - a.exact_count;
-      if (b.partial_count !== a.partial_count) return b.partial_count - a.partial_count;
-      return a.negative_count - b.negative_count;
-    });
-
-    // Assign positions with ties
-    let currentPos = 1;
-    for (let i = 0; i < sorted.length; i++) {
-      if (i > 0) {
-        const prev = sorted[i - 1];
-        const curr = sorted[i];
-        if (curr.total_points === prev.total_points &&
-            curr.exact_count === prev.exact_count &&
-            curr.partial_count === prev.partial_count &&
-            curr.negative_count === prev.negative_count) {
-          curr.position = prev.position;
+      scores.forEach(s => {
+        const entry = userMap.get(s.user_id);
+        if (!entry) return;
+        entry.total_points += s.points;
+        if (s.points === 5) entry.exact_count++;
+        else if (s.points === 2) entry.partial_count++;
+        else if (s.points === -1) entry.negative_count++;
+      });
+      const sorted = Array.from(userMap.values()).sort((a, b) => {
+        if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+        if (b.exact_count !== a.exact_count) return b.exact_count - a.exact_count;
+        if (b.partial_count !== a.partial_count) return b.partial_count - a.partial_count;
+        return a.negative_count - b.negative_count;
+      });
+      for (let i = 0; i < sorted.length; i++) {
+        if (i > 0) {
+          const prev = sorted[i - 1];
+          const curr = sorted[i];
+          if (curr.total_points === prev.total_points && curr.exact_count === prev.exact_count &&
+              curr.partial_count === prev.partial_count && curr.negative_count === prev.negative_count) {
+            curr.position = prev.position;
+          } else {
+            curr.position = i + 1;
+          }
         } else {
-          curr.position = i + 1;
+          sorted[i].position = 1;
         }
-      } else {
-        sorted[i].position = 1;
       }
+      return sorted;
+    };
+
+    const currentRanking = buildRanking(scoresData);
+
+    // Calculate previous ranking (excluding the latest finished match)
+    if (tab === 'geral' && finishedMatches && finishedMatches.length >= 2) {
+      const latestMatchId = finishedMatches[0].id;
+      const prevScores = scoresData.filter(s => s.match_id !== latestMatchId);
+      const prevRanking = buildRanking(prevScores);
+      const prevPosMap = new Map<string, number>();
+      prevRanking.forEach(e => prevPosMap.set(e.user_id, e.position));
+      currentRanking.forEach(e => {
+        const prevPos = prevPosMap.get(e.user_id);
+        if (prevPos !== undefined) {
+          e.positionChange = prevPos - e.position; // positive = gained positions
+        }
+      });
     }
 
-    setRanking(sorted);
+    setRanking(currentRanking);
     setLoading(false);
   };
 
