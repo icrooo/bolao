@@ -6,7 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Loader2, Check, Lock, Minus, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, isToday, isTomorrow } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 type Match = {
@@ -42,7 +42,7 @@ type AllPrediction = {
 
 type Profile = { user_id: string; name: string };
 
-const FILTERS = ['TODOS', 'HOJE', 'EM ABERTO', 'GRUPOS'] as const;
+const FILTERS = ['PRÓXIMOS JOGOS', 'TODOS', 'GRUPOS'] as const;
 
 function ScoreBadge({ points }: { points: number }) {
   const cls = points === 5 ? 'score-badge-5' : points === 2 ? 'score-badge-2' : points === -1 ? 'score-badge-negative' : 'score-badge-0';
@@ -229,7 +229,8 @@ export default function PredictionsPage() {
   const [scores, setScores] = useState<Map<string, Score>>(new Map());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
-  const [filter, setFilter] = useState<string>('TODOS');
+  const [savedMatches, setSavedMatches] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState<string>('PRÓXIMOS JOGOS');
   const [drafts, setDrafts] = useState<Map<string, { home: number; away: number }>>(new Map());
   const [, forceUpdate] = useState(0);
 
@@ -313,20 +314,24 @@ export default function PredictionsPage() {
   }, []);
 
   const filteredMatches = useMemo(() => {
-    let filtered = matches.filter(m => {
-      if (filter === 'GRUPOS') return true;
-      if (filter === 'HOJE') {
-        const dt = new Date(m.match_datetime);
-        return isToday(dt) || isTomorrow(dt);
-      }
-      if (filter === 'EM ABERTO') return !predictions.has(m.id) && !isLocked(m);
-      return true;
-    });
-    if (filter === 'GRUPOS') {
-      filtered = [...filtered].sort((a, b) => a.group_name.localeCompare(b.group_name) || new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime());
+    if (filter === 'PRÓXIMOS JOGOS') {
+      const now = serverNow();
+      // Get current date at 4am to define "day boundary"
+      const today4am = new Date(now);
+      today4am.setHours(4, 0, 0, 0);
+      if (now < today4am.getTime()) today4am.setDate(today4am.getDate() - 1);
+      
+      const upcoming = matches
+        .filter(m => !m.is_finished && new Date(m.match_datetime).getTime() >= today4am.getTime())
+        .sort((a, b) => new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime())
+        .slice(0, 4);
+      return upcoming;
     }
-    return filtered;
-  }, [matches, filter, predictions, isLocked]);
+    if (filter === 'GRUPOS') {
+      return [...matches].sort((a, b) => a.group_name.localeCompare(b.group_name) || new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime());
+    }
+    return matches;
+  }, [matches, filter, serverNow]);
 
   const getDraft = (matchId: string) => {
     const draft = drafts.get(matchId);
@@ -357,7 +362,7 @@ export default function PredictionsPage() {
           .insert({ user_id: user.id, match_id: match.id, home_score_pred: draft.home, away_score_pred: draft.away });
         if (error) throw error;
       }
-      toast.success('Palpite salvo!');
+      setSavedMatches(prev => new Set(prev).add(match.id));
       await fetchData();
       setDrafts(prev => { const n = new Map(prev); n.delete(match.id); return n; });
     } catch (e: any) {
@@ -483,36 +488,38 @@ export default function PredictionsPage() {
                     </div>
                   </div>
 
-                  {/* Prediction indicator + Save (only for unlocked, not started/finished) */}
+                  {/* Save button (only for unlocked, not started/finished) */}
                   {!match.is_finished && !match.is_started && !locked && (
-                    <div className="flex items-center justify-between mt-3">
-                      {pred && !changed ? (
-                        <span className="text-xs text-primary flex items-center gap-1">
-                          <Check className="h-3 w-3" /> Palpite salvo
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          {pred ? 'Palpite alterado' : 'Sem palpite'}
-                        </span>
-                      )}
-                      {(changed || !pred) && (
-                        <Button
-                          size="sm"
-                          onClick={() => savePrediction(match)}
-                          disabled={saving === match.id}
-                          className="h-7 text-xs active:scale-95"
-                        >
-                          {saving === match.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Salvar'}
-                        </Button>
-                      )}
+                    <div className="flex items-center justify-end mt-3">
+                      {(() => {
+                        const justSaved = savedMatches.has(match.id) && !changed;
+                        const hasPred = !!pred;
+                        const isDisabled = saving === match.id || (hasPred && !changed && justSaved);
+                        const label = saving === match.id
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : justSaved && !changed
+                            ? <><Check className="h-3 w-3 mr-1" /> Salvo!</>
+                            : hasPred && changed
+                              ? 'Alterar'
+                              : hasPred && !changed
+                                ? <><Check className="h-3 w-3 mr-1" /> Salvo!</>
+                                : 'Salvar';
+                        return (
+                          <Button
+                            size="sm"
+                            onClick={() => savePrediction(match)}
+                            disabled={isDisabled}
+                            className={`h-7 text-xs active:scale-95 ${
+                              (justSaved || (hasPred && !changed))
+                                ? 'bg-foreground/30 text-foreground/50 cursor-not-allowed'
+                                : 'bg-foreground text-background hover:bg-foreground/90'
+                            }`}
+                          >
+                            {label}
+                          </Button>
+                        );
+                      })()}
                     </div>
-                  )}
-
-                  {/* Show user's prediction for finished match */}
-                  {match.is_finished && pred && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Seu palpite: {pred.home_score_pred} × {pred.away_score_pred}
-                    </p>
                   )}
 
                   {/* Expandable predictions for locked/in-progress matches */}

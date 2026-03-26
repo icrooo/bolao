@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
@@ -232,7 +235,14 @@ export default function AdminPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Input type="datetime-local" value={newMatch.match_datetime} onChange={e => setNewMatch({ ...newMatch, match_datetime: e.target.value })} />
-                  <Input placeholder="Grupo (A-L)" maxLength={1} value={newMatch.group_name} onChange={e => setNewMatch({ ...newMatch, group_name: e.target.value.toUpperCase() })} />
+                  <Select value={newMatch.group_name} onValueChange={v => setNewMatch({ ...newMatch, group_name: v })}>
+                    <SelectTrigger><SelectValue placeholder="Grupo/Fase" /></SelectTrigger>
+                    <SelectContent>
+                      {['A','B','C','D','E','F','G','H','I','J','K','L','16-AVOS','OITAVAS','QUARTAS','SEMI','3º e 4º','FINAL'].map(g => (
+                        <SelectItem key={g} value={g}>{g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button size="sm" onClick={addMatch} className="w-full active:scale-95">Salvar</Button>
               </div>
@@ -281,7 +291,14 @@ export default function AdminPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <Input type="datetime-local" value={editData.match_datetime} onChange={e => setEditData({ ...editData, match_datetime: e.target.value })} />
-                      <Input placeholder="Grupo" maxLength={1} value={editData.group_name} onChange={e => setEditData({ ...editData, group_name: e.target.value.toUpperCase() })} />
+                      <Select value={editData.group_name} onValueChange={v => setEditData({ ...editData, group_name: v })}>
+                        <SelectTrigger><SelectValue placeholder="Grupo/Fase" /></SelectTrigger>
+                        <SelectContent>
+                          {['A','B','C','D','E','F','G','H','I','J','K','L','16-AVOS','OITAVAS','QUARTAS','SEMI','3º e 4º','FINAL'].map(g => (
+                            <SelectItem key={g} value={g}>{g}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <Button size="sm" onClick={() => saveEdit(m.id)} className="w-full active:scale-95">Salvar alterações</Button>
                   </div>
