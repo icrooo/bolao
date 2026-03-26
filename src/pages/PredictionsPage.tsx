@@ -6,7 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Loader2, Check, Lock, Minus, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, isToday, isTomorrow } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 type Match = {
