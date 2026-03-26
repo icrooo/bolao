@@ -202,9 +202,17 @@ export default function RankingPage() {
                       )}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold tabular-nums">{entry.total_points}</p>
-                    <p className="text-[10px] text-muted-foreground">pts</p>
+                  <div className="text-right flex items-center gap-2">
+                    {entry.positionChange !== null && entry.positionChange !== 0 && (
+                      <span className={`flex items-center text-[10px] font-bold ${entry.positionChange > 0 ? 'text-green-600' : 'text-destructive'}`}>
+                        {entry.positionChange > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                        {Math.abs(entry.positionChange)}
+                      </span>
+                    )}
+                    <div>
+                      <p className="font-bold tabular-nums">{entry.total_points}</p>
+                      <p className="text-[10px] text-muted-foreground">pts</p>
+                    </div>
                   </div>
                 </div>
               );
