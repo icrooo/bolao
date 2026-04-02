@@ -3,6 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/AppLayout';
 import { Loader2, ChevronLeft, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { format, addDays, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -17,14 +20,32 @@ type RankingEntry = {
   positionChange: number | null;
 };
 
+type FriendshipGroup = { id: string; name: string };
+type UserFriendshipGroup = { user_id: string; group_id: string };
+
 export default function RankingPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<'geral' | 'dia'>('geral');
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [friendshipGroups, setFriendshipGroups] = useState<FriendshipGroup[]>([]);
+  const [userFriendshipGroups, setUserFriendshipGroups] = useState<UserFriendshipGroup[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<string>('all');
 
-  useEffect(() => { fetchRanking(); }, [tab, selectedDate]);
+  useEffect(() => {
+    const fetchGroups = async () => {
+      const [fgRes, ufgRes] = await Promise.all([
+        supabase.from('friendship_groups').select('id, name').order('name'),
+        supabase.from('user_friendship_groups').select('user_id, group_id'),
+      ]);
+      if (fgRes.data) setFriendshipGroups(fgRes.data);
+      if (ufgRes.data) setUserFriendshipGroups(ufgRes.data);
+    };
+    fetchGroups();
+  }, []);
+
+  useEffect(() => { fetchRanking(); }, [tab, selectedDate, selectedGroup, userFriendshipGroups]);
 
   useEffect(() => {
     const channel = supabase
@@ -32,14 +53,20 @@ export default function RankingPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => fetchRanking())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [tab, selectedDate]);
+  }, [tab, selectedDate, selectedGroup, userFriendshipGroups]);
 
   const fetchRanking = async () => {
     setLoading(true);
     const { data: profiles } = await supabase.from('profiles').select('user_id, name').eq('is_approved', true);
     if (!profiles) { setLoading(false); return; }
 
-    // Get finished matches for "previous ranking" calculation
+    // Filter by friendship group
+    let filteredProfiles = profiles;
+    if (selectedGroup !== 'all') {
+      const groupUserIds = new Set(userFriendshipGroups.filter(ufg => ufg.group_id === selectedGroup).map(ufg => ufg.user_id));
+      filteredProfiles = profiles.filter(p => groupUserIds.has(p.user_id));
+    }
+
     const { data: finishedMatches } = await supabase.from('matches').select('id, match_datetime').eq('is_finished', true).order('match_datetime', { ascending: false });
 
     let scoresQuery = supabase.from('scores').select('user_id, match_id, points');
@@ -49,26 +76,18 @@ export default function RankingPage() {
       dayStart.setHours(0, 0, 0, 0);
       const dayEnd = new Date(selectedDate);
       dayEnd.setHours(23, 59, 59, 999);
-
-      const { data: dayMatches } = await supabase
-        .from('matches').select('id')
-        .gte('match_datetime', dayStart.toISOString())
-        .lte('match_datetime', dayEnd.toISOString());
-
-      if (!dayMatches || dayMatches.length === 0) {
-        setRanking([]);
-        setLoading(false);
-        return;
-      }
+      const { data: dayMatches } = await supabase.from('matches').select('id')
+        .gte('match_datetime', dayStart.toISOString()).lte('match_datetime', dayEnd.toISOString());
+      if (!dayMatches || dayMatches.length === 0) { setRanking([]); setLoading(false); return; }
       scoresQuery = scoresQuery.in('match_id', dayMatches.map(m => m.id));
     }
 
     const { data: scoresData } = await scoresQuery;
     if (!scoresData) { setLoading(false); return; }
 
-    const buildRanking = (scores: typeof scoresData) => {
+    const buildRanking = (scores: typeof scoresData, profs: typeof filteredProfiles) => {
       const userMap = new Map<string, RankingEntry>();
-      profiles.forEach(p => {
+      profs.forEach(p => {
         userMap.set(p.user_id, {
           user_id: p.user_id, name: p.name,
           total_points: 0, exact_count: 0, partial_count: 0, negative_count: 0,
@@ -107,19 +126,18 @@ export default function RankingPage() {
       return sorted;
     };
 
-    const currentRanking = buildRanking(scoresData);
+    const currentRanking = buildRanking(scoresData, filteredProfiles);
 
-    // Calculate previous ranking (excluding the latest finished match)
     if (tab === 'geral' && finishedMatches && finishedMatches.length >= 2) {
       const latestMatchId = finishedMatches[0].id;
       const prevScores = scoresData.filter(s => s.match_id !== latestMatchId);
-      const prevRanking = buildRanking(prevScores);
+      const prevRanking = buildRanking(prevScores, filteredProfiles);
       const prevPosMap = new Map<string, number>();
       prevRanking.forEach(e => prevPosMap.set(e.user_id, e.position));
       currentRanking.forEach(e => {
         const prevPos = prevPosMap.get(e.user_id);
         if (prevPos !== undefined) {
-          e.positionChange = prevPos - e.position; // positive = gained positions
+          e.positionChange = prevPos - e.position;
         }
       });
     }
@@ -151,6 +169,19 @@ export default function RankingPage() {
             </button>
           ))}
         </div>
+
+        {/* Friendship group filter */}
+        <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder="Filtrar por grupo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os participantes</SelectItem>
+            {friendshipGroups.map(g => (
+              <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {tab === 'dia' && (
           <div className="flex items-center justify-center gap-4">

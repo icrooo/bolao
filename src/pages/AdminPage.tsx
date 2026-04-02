@@ -11,7 +11,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Trophy, Trash2, Pencil, X, Play, Minus } from 'lucide-react';
+import { Loader2, Plus, Trophy, Trash2, Pencil, X, Play, Minus, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -22,6 +22,11 @@ type Match = {
   group_name: string; home_score: number | null; away_score: number | null;
   is_finished: boolean; is_started: boolean;
 };
+type FriendshipGroup = { id: string; name: string };
+type UserFriendshipGroup = { id: string; user_id: string; group_id: string };
+
+const KNOCKOUT_PHASES = ['16-AVOS', 'OITAVAS', 'QUARTAS', 'SEMI', '3º e 4º', 'FINAL'];
+const GROUP_OPTIONS = ['A','B','C','D','E','F','G','H','I','J','K','L', ...KNOCKOUT_PHASES];
 
 export default function AdminPage() {
   const [tab, setTab] = useState<'matches' | 'users'>('matches');
@@ -37,15 +42,29 @@ export default function AdminPage() {
   const [editData, setEditData] = useState({ home_team: '', away_team: '', match_datetime: '', group_name: '' });
   const [updatingScore, setUpdatingScore] = useState<string | null>(null);
 
+  // Friendship groups
+  const [friendshipGroups, setFriendshipGroups] = useState<FriendshipGroup[]>([]);
+  const [userFriendshipGroups, setUserFriendshipGroups] = useState<UserFriendshipGroup[]>([]);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [showAddGroup, setShowAddGroup] = useState(false);
+
+  // User name editing
+  const [editingUserName, setEditingUserName] = useState<string | null>(null);
+  const [editNameValue, setEditNameValue] = useState('');
+
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
-    const [profRes, matchRes] = await Promise.all([
+    const [profRes, matchRes, fgRes, ufgRes] = await Promise.all([
       supabase.from('profiles').select('*').order('created_at', { ascending: false }),
       supabase.from('matches').select('*').order('match_datetime', { ascending: true }),
+      supabase.from('friendship_groups').select('*').order('name'),
+      supabase.from('user_friendship_groups').select('*'),
     ]);
     if (profRes.data) setProfiles(profRes.data as Profile[]);
     if (matchRes.data) setMatches(matchRes.data as Match[]);
+    if (fgRes.data) setFriendshipGroups(fgRes.data as FriendshipGroup[]);
+    if (ufgRes.data) setUserFriendshipGroups(ufgRes.data as UserFriendshipGroup[]);
     setLoading(false);
   };
 
@@ -61,10 +80,51 @@ export default function AdminPage() {
     await supabase.from('scores').delete().eq('user_id', profile.user_id);
     await supabase.from('predictions').delete().eq('user_id', profile.user_id);
     await supabase.from('user_roles').delete().eq('user_id', profile.user_id);
+    await supabase.from('user_friendship_groups').delete().eq('user_id', profile.user_id);
     const { error } = await supabase.from('profiles').delete().eq('user_id', profile.user_id);
     if (error) { toast.error(error.message); return; }
     toast.success('Usuário excluído!');
     setProfiles(prev => prev.filter(p => p.user_id !== profile.user_id));
+  };
+
+  const saveUserName = async (userId: string) => {
+    if (!editNameValue.trim()) { toast.error('Nome não pode ser vazio'); return; }
+    const { error } = await supabase.from('profiles').update({ name: editNameValue.trim() }).eq('user_id', userId);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Nome atualizado!');
+    setProfiles(prev => prev.map(p => p.user_id === userId ? { ...p, name: editNameValue.trim() } : p));
+    setEditingUserName(null);
+  };
+
+  // Friendship group management
+  const addFriendshipGroup = async () => {
+    if (!newGroupName.trim()) { toast.error('Nome do grupo é obrigatório'); return; }
+    const { error } = await supabase.from('friendship_groups').insert({ name: newGroupName.trim() });
+    if (error) { toast.error(error.message); return; }
+    toast.success('Grupo criado!');
+    setNewGroupName('');
+    setShowAddGroup(false);
+    fetchData();
+  };
+
+  const deleteFriendshipGroup = async (groupId: string) => {
+    if (!window.confirm('Excluir este grupo de amizade?')) return;
+    const { error } = await supabase.from('friendship_groups').delete().eq('id', groupId);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Grupo excluído!');
+    fetchData();
+  };
+
+  const toggleUserGroup = async (userId: string, groupId: string) => {
+    const existing = userFriendshipGroups.find(ufg => ufg.user_id === userId && ufg.group_id === groupId);
+    if (existing) {
+      await supabase.from('user_friendship_groups').delete().eq('id', existing.id);
+    } else {
+      const userGroups = userFriendshipGroups.filter(ufg => ufg.user_id === userId);
+      if (userGroups.length >= 3) { toast.error('Máximo de 3 grupos por usuário'); return; }
+      await supabase.from('user_friendship_groups').insert({ user_id: userId, group_id: groupId });
+    }
+    fetchData();
   };
 
   const addMatch = async () => {
@@ -72,10 +132,8 @@ export default function AdminPage() {
       toast.error('Preencha todos os campos'); return;
     }
     const { error } = await supabase.from('matches').insert({
-      home_team: newMatch.home_team,
-      away_team: newMatch.away_team,
-      match_datetime: new Date(newMatch.match_datetime).toISOString(),
-      group_name: newMatch.group_name,
+      home_team: newMatch.home_team, away_team: newMatch.away_team,
+      match_datetime: new Date(newMatch.match_datetime).toISOString(), group_name: newMatch.group_name,
     });
     if (error) { toast.error(error.message); return; }
     toast.success('Jogo adicionado!');
@@ -87,8 +145,7 @@ export default function AdminPage() {
   const startEdit = (m: Match) => {
     setEditingMatch(m.id);
     setEditData({
-      home_team: m.home_team,
-      away_team: m.away_team,
+      home_team: m.home_team, away_team: m.away_team,
       match_datetime: format(new Date(m.match_datetime), "yyyy-MM-dd'T'HH:mm"),
       group_name: m.group_name,
     });
@@ -99,10 +156,8 @@ export default function AdminPage() {
       toast.error('Preencha todos os campos'); return;
     }
     const { error } = await supabase.from('matches').update({
-      home_team: editData.home_team,
-      away_team: editData.away_team,
-      match_datetime: new Date(editData.match_datetime).toISOString(),
-      group_name: editData.group_name,
+      home_team: editData.home_team, away_team: editData.away_team,
+      match_datetime: new Date(editData.match_datetime).toISOString(), group_name: editData.group_name,
     }).eq('id', matchId);
     if (error) { toast.error(error.message); return; }
     toast.success('Jogo atualizado!');
@@ -116,14 +171,11 @@ export default function AdminPage() {
     const current = match[field] ?? 0;
     const newVal = Math.max(0, current + delta);
     const otherField = field === 'home_score' ? 'away_score' : 'home_score';
-
     setUpdatingScore(matchId);
     const updatePayload: any = { [field]: newVal };
     if (match[otherField] === null) updatePayload[otherField] = 0;
-
     const { error } = await supabase.from('matches').update(updatePayload).eq('id', matchId);
     if (error) { toast.error(error.message); setUpdatingScore(null); return; }
-
     await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
     setUpdatingScore(null);
     fetchData();
@@ -131,13 +183,8 @@ export default function AdminPage() {
 
   const startMatch = async (matchId: string) => {
     setStartingMatch(matchId);
-    const { error } = await supabase.from('matches').update({
-      is_started: true,
-      home_score: 0,
-      away_score: 0,
-    }).eq('id', matchId);
+    const { error } = await supabase.from('matches').update({ is_started: true, home_score: 0, away_score: 0 }).eq('id', matchId);
     if (error) { toast.error(error.message); setStartingMatch(null); return; }
-
     await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
     toast.success('Jogo iniciado!');
     setStartingMatch(null);
@@ -160,13 +207,14 @@ export default function AdminPage() {
     setFinishingMatch(matchId);
     const { error } = await supabase.from('matches').update({ is_finished: true }).eq('id', matchId);
     if (error) { toast.error(error.message); setFinishingMatch(null); return; }
-
     await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
     toast.success('Jogo encerrado!');
     setFinishingMatch(null);
     setConfirmFinish(null);
     fetchData();
   };
+
+  const getGroupLabel = (name: string) => KNOCKOUT_PHASES.includes(name) ? name : `Grupo ${name}`;
 
   if (loading) {
     return (
@@ -179,7 +227,6 @@ export default function AdminPage() {
   return (
     <AppLayout>
       <div className="space-y-4">
-        {/* Tabs */}
         <div className="flex gap-1 bg-secondary rounded-lg p-1">
           {(['matches', 'users'] as const).map(t => (
             <button
@@ -195,29 +242,92 @@ export default function AdminPage() {
         </div>
 
         {tab === 'users' && (
-          <div className="space-y-2">
-            {profiles.map((p, i) => (
-              <div key={p.id} className="glass-card p-3 flex items-center justify-between animate-reveal-up" style={{ animationDelay: `${i * 50}ms` }}>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-sm truncate">{p.name}</p>
-                  <p className="text-[10px] text-muted-foreground truncate">
-                    {p.email ?? 'Sem e-mail'} · {format(new Date(p.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={p.is_approved}
-                    onCheckedChange={(checked) => approveUser(p.user_id, checked)}
-                  />
-                  <button
-                    onClick={() => deleteUser(p)}
-                    className="text-destructive hover:text-destructive/80 active:scale-90 transition-all"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+          <div className="space-y-4">
+            {/* Friendship Groups Management */}
+            <div className="glass-card p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Grupos de Amizade</p>
+                <button onClick={() => setShowAddGroup(!showAddGroup)} className="text-primary hover:text-primary/80 active:scale-95 transition-all">
+                  <Plus className="h-4 w-4" />
+                </button>
               </div>
-            ))}
+              {showAddGroup && (
+                <div className="flex gap-2">
+                  <Input placeholder="Nome do grupo" value={newGroupName} onChange={e => setNewGroupName(e.target.value)} className="h-8 text-xs" />
+                  <Button size="sm" onClick={addFriendshipGroup} className="h-8 text-xs active:scale-95">Criar</Button>
+                </div>
+              )}
+              <div className="flex flex-wrap gap-1">
+                {friendshipGroups.map(g => (
+                  <span key={g.id} className="inline-flex items-center gap-1 text-[10px] bg-secondary px-2 py-1 rounded-full">
+                    {g.name}
+                    <button onClick={() => deleteFriendshipGroup(g.id)} className="text-destructive hover:text-destructive/80">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+                {friendshipGroups.length === 0 && <p className="text-[10px] text-muted-foreground">Nenhum grupo criado</p>}
+              </div>
+            </div>
+
+            {/* Users list */}
+            {profiles.map((p, i) => {
+              const userGroups = userFriendshipGroups.filter(ufg => ufg.user_id === p.user_id);
+              return (
+                <div key={p.id} className="glass-card p-3 animate-reveal-up space-y-2" style={{ animationDelay: `${i * 50}ms` }}>
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      {editingUserName === p.user_id ? (
+                        <div className="flex items-center gap-1">
+                          <Input value={editNameValue} onChange={e => setEditNameValue(e.target.value)} className="h-7 text-sm" />
+                          <button onClick={() => saveUserName(p.user_id)} className="text-primary hover:text-primary/80 active:scale-90 transition-all">
+                            <Check className="h-4 w-4" />
+                          </button>
+                          <button onClick={() => setEditingUserName(null)} className="text-muted-foreground hover:text-foreground active:scale-90 transition-all">
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <p className="font-medium text-sm truncate">{p.name}</p>
+                          <button onClick={() => { setEditingUserName(p.user_id); setEditNameValue(p.name); }} className="text-muted-foreground hover:text-foreground active:scale-90 transition-all">
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {p.email ?? 'Sem e-mail'} · {format(new Date(p.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch checked={p.is_approved} onCheckedChange={(checked) => approveUser(p.user_id, checked)} />
+                      <button onClick={() => deleteUser(p)} className="text-destructive hover:text-destructive/80 active:scale-90 transition-all">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  {/* Friendship group selectors */}
+                  {friendshipGroups.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {friendshipGroups.map(g => {
+                        const isIn = userGroups.some(ufg => ufg.group_id === g.id);
+                        return (
+                          <button
+                            key={g.id}
+                            onClick={() => toggleUserGroup(p.user_id, g.id)}
+                            className={`text-[10px] px-2 py-0.5 rounded-full transition-colors active:scale-95 ${
+                              isIn ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                            }`}
+                          >
+                            {g.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -238,9 +348,7 @@ export default function AdminPage() {
                   <Select value={newMatch.group_name} onValueChange={v => setNewMatch({ ...newMatch, group_name: v })}>
                     <SelectTrigger><SelectValue placeholder="Grupo/Fase" /></SelectTrigger>
                     <SelectContent>
-                      {['A','B','C','D','E','F','G','H','I','J','K','L','16-AVOS','OITAVAS','QUARTAS','SEMI','3º e 4º','FINAL'].map(g => (
-                        <SelectItem key={g} value={g}>{g}</SelectItem>
-                      ))}
+                      {GROUP_OPTIONS.map(g => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -251,8 +359,8 @@ export default function AdminPage() {
             {matches.map((m, i) => (
               <div key={m.id} className="glass-card p-4 animate-reveal-up" style={{ animationDelay: `${i * 50}ms` }}>
                 <div className="flex items-center justify-between mb-3">
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                      {['16-AVOS','OITAVAS','QUARTAS','SEMI','3º e 4º','FINAL'].includes(m.group_name) ? m.group_name : `Grupo ${m.group_name}`} · {format(new Date(m.match_datetime), "dd MMM HH:mm", { locale: ptBR })}
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                    {getGroupLabel(m.group_name)} · {format(new Date(m.match_datetime), "dd MMM HH:mm", { locale: ptBR })}
                   </span>
                   <div className="flex items-center gap-2">
                     {m.is_finished && (
@@ -266,23 +374,16 @@ export default function AdminPage() {
                       </span>
                     )}
                     {!m.is_finished && (
-                      <button
-                        onClick={() => editingMatch === m.id ? setEditingMatch(null) : startEdit(m)}
-                        className="text-muted-foreground hover:text-foreground active:scale-90 transition-all"
-                      >
+                      <button onClick={() => editingMatch === m.id ? setEditingMatch(null) : startEdit(m)} className="text-muted-foreground hover:text-foreground active:scale-90 transition-all">
                         {editingMatch === m.id ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
                       </button>
                     )}
-                    <button
-                      onClick={() => deleteMatch(m.id)}
-                      className="text-destructive hover:text-destructive/80 active:scale-90 transition-all"
-                    >
+                    <button onClick={() => deleteMatch(m.id)} className="text-destructive hover:text-destructive/80 active:scale-90 transition-all">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
 
-                {/* Edit mode */}
                 {editingMatch === m.id ? (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-2">
@@ -294,9 +395,7 @@ export default function AdminPage() {
                       <Select value={editData.group_name} onValueChange={v => setEditData({ ...editData, group_name: v })}>
                         <SelectTrigger><SelectValue placeholder="Grupo/Fase" /></SelectTrigger>
                         <SelectContent>
-                          {['A','B','C','D','E','F','G','H','I','J','K','L','16-AVOS','OITAVAS','QUARTAS','SEMI','3º e 4º','FINAL'].map(g => (
-                            <SelectItem key={g} value={g}>{g}</SelectItem>
-                          ))}
+                          {GROUP_OPTIONS.map(g => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -308,7 +407,6 @@ export default function AdminPage() {
                   </p>
                 ) : (
                   <>
-                    {/* Score +/- controls */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex-1 text-right">
                         <p className="text-sm font-medium truncate">{m.home_team}</p>
@@ -316,19 +414,13 @@ export default function AdminPage() {
                       <div className="flex items-center gap-1">
                         {m.is_started ? (
                           <>
-                            <button
-                              disabled={updatingScore === m.id || (m.home_score ?? 0) <= 0}
-                              onClick={() => adjustScore(m.id, 'home_score', -1)}
-                              className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform"
-                            >
+                            <button disabled={updatingScore === m.id || (m.home_score ?? 0) <= 0} onClick={() => adjustScore(m.id, 'home_score', -1)}
+                              className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform">
                               <Minus className="h-3 w-3" />
                             </button>
                             <span className="w-6 text-center font-bold tabular-nums">{m.home_score ?? 0}</span>
-                            <button
-                              disabled={updatingScore === m.id}
-                              onClick={() => adjustScore(m.id, 'home_score', 1)}
-                              className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform"
-                            >
+                            <button disabled={updatingScore === m.id} onClick={() => adjustScore(m.id, 'home_score', 1)}
+                              className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform">
                               <Plus className="h-3 w-3" />
                             </button>
                           </>
@@ -340,19 +432,13 @@ export default function AdminPage() {
                       <div className="flex items-center gap-1">
                         {m.is_started ? (
                           <>
-                            <button
-                              disabled={updatingScore === m.id || (m.away_score ?? 0) <= 0}
-                              onClick={() => adjustScore(m.id, 'away_score', -1)}
-                              className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform"
-                            >
+                            <button disabled={updatingScore === m.id || (m.away_score ?? 0) <= 0} onClick={() => adjustScore(m.id, 'away_score', -1)}
+                              className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform">
                               <Minus className="h-3 w-3" />
                             </button>
                             <span className="w-6 text-center font-bold tabular-nums">{m.away_score ?? 0}</span>
-                            <button
-                              disabled={updatingScore === m.id}
-                              onClick={() => adjustScore(m.id, 'away_score', 1)}
-                              className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform"
-                            >
+                            <button disabled={updatingScore === m.id} onClick={() => adjustScore(m.id, 'away_score', 1)}
+                              className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform">
                               <Plus className="h-3 w-3" />
                             </button>
                           </>
@@ -367,22 +453,13 @@ export default function AdminPage() {
 
                     <div className="flex gap-2 mt-3">
                       {!m.is_started ? (
-                        <Button
-                          size="sm"
-                          onClick={() => startMatch(m.id)}
-                          disabled={startingMatch === m.id}
-                          className="flex-1 text-xs active:scale-95 bg-green-600 hover:bg-green-700"
-                        >
+                        <Button size="sm" onClick={() => startMatch(m.id)} disabled={startingMatch === m.id}
+                          className="flex-1 text-xs active:scale-95 bg-green-600 hover:bg-green-700">
                           {startingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Play className="h-3 w-3 mr-1" /> Iniciar jogo</>}
                         </Button>
                       ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setConfirmFinish(m.id)}
-                          disabled={finishingMatch === m.id}
-                          className="flex-1 text-xs active:scale-95"
-                        >
+                        <Button size="sm" variant="outline" onClick={() => setConfirmFinish(m.id)} disabled={finishingMatch === m.id}
+                          className="flex-1 text-xs active:scale-95">
                           {finishingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '🏁 Encerrar'}
                         </Button>
                       )}
@@ -395,7 +472,6 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* Finish confirmation dialog */}
       <AlertDialog open={!!confirmFinish} onOpenChange={(open) => { if (!open) setConfirmFinish(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -406,9 +482,7 @@ export default function AdminPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => confirmFinish && finishMatch(confirmFinish)}>
-              Encerrar
-            </AlertDialogAction>
+            <AlertDialogAction onClick={() => confirmFinish && finishMatch(confirmFinish)}>Encerrar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
