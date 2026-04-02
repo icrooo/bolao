@@ -229,5 +229,11 @@ export function getCountryCode(name: string): string | null {
 export function getFlagUrl(countryName: string, size: 16 | 24 | 32 | 48 | 64 = 32): string | null {
   const code = getCountryCode(countryName);
   if (!code) return null;
+  // flagsapi.com doesn't support sub-national codes like GB-ENG, GB-SCT, GB-WLS
+  // Use flagcdn.com for those
+  if (code.startsWith('GB-')) {
+    const sub = code.split('-')[1].toLowerCase();
+    return `https://flagcdn.com/w${size}/${sub}.png`;
+  }
   return `https://flagsapi.com/${code}/flat/${size}.png`;
 }
