@@ -40,6 +40,9 @@ export default function AuthPage() {
     );
   }
 
+  const [forgotPassword, setForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -58,6 +61,23 @@ export default function AuthPage() {
         if (error) throw error;
         toast.success('Cadastro realizado! Aguarde aprovação do administrador.');
       }
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      toast.success('E-mail de recuperação enviado! Verifique sua caixa de entrada.');
+      setForgotPassword(false);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
