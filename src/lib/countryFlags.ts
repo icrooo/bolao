@@ -72,6 +72,11 @@ const countryCodeMap: Record<string, string> = {
   'Tunisia': 'TN',
 
   // Other teams
+  'África do Sul': 'ZA',
+  'South Africa': 'ZA',
+  'Cabo Verde': 'CV',
+  'Cape Verde': 'CV',
+  'Congo': 'CD',
   'Austrália': 'AU',
   'Australia': 'AU',
   'Gana': 'GH',
@@ -106,12 +111,12 @@ const countryCodeMap: Record<string, string> = {
   'Switzerland': 'CH',
   'Polônia': 'PL',
   'Poland': 'PL',
-  'País de Gales': 'GB',
+  'País de Gales': 'GB-WLS',
   'Wales': 'GB-WLS',
-  'Inglaterra': 'GB',
-  'England': 'GB',
-  'Escócia': 'GB',
-  'Scotland': 'GB',
+  'Inglaterra': 'GB-ENG',
+  'England': 'GB-ENG',
+  'Escócia': 'GB-SCT',
+  'Scotland': 'GB-SCT',
   'Turquia': 'TR',
   'Turkey': 'TR',
   'Ucrânia': 'UA',
@@ -224,5 +229,11 @@ export function getCountryCode(name: string): string | null {
 export function getFlagUrl(countryName: string, size: 16 | 24 | 32 | 48 | 64 = 32): string | null {
   const code = getCountryCode(countryName);
   if (!code) return null;
+  // flagsapi.com doesn't support sub-national codes like GB-ENG, GB-SCT, GB-WLS
+  // Use flagcdn.com for those
+  if (code.startsWith('GB-')) {
+    const sub = code.split('-')[1].toLowerCase();
+    return `https://flagcdn.com/w${size}/${sub}.png`;
+  }
   return `https://flagsapi.com/${code}/flat/${size}.png`;
 }
