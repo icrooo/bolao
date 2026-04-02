@@ -72,6 +72,11 @@ const countryCodeMap: Record<string, string> = {
   'Tunisia': 'TN',
 
   // Other teams
+  'África do Sul': 'ZA',
+  'South Africa': 'ZA',
+  'Cabo Verde': 'CV',
+  'Cape Verde': 'CV',
+  'Congo': 'CD',
   'Austrália': 'AU',
   'Australia': 'AU',
   'Gana': 'GH',
