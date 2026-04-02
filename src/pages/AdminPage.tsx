@@ -251,8 +251,8 @@ export default function AdminPage() {
             {matches.map((m, i) => (
               <div key={m.id} className="glass-card p-4 animate-reveal-up" style={{ animationDelay: `${i * 50}ms` }}>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                    Grupo {m.group_name} · {format(new Date(m.match_datetime), "dd MMM HH:mm", { locale: ptBR })}
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                      {['16-AVOS','OITAVAS','QUARTAS','SEMI','3º e 4º','FINAL'].includes(m.group_name) ? m.group_name : `Grupo ${m.group_name}`} · {format(new Date(m.match_datetime), "dd MMM HH:mm", { locale: ptBR })}
                   </span>
                   <div className="flex items-center gap-2">
                     {m.is_finished && (

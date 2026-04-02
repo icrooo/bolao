@@ -92,7 +92,7 @@ export default function AuthPage() {
           <h1 className="text-4xl mb-1" style={{ lineHeight: '1.1' }}>Bolão Copa</h1>
           <p className="text-5xl font-serif text-primary" style={{ lineHeight: '1.1' }}>2026</p>
           <p className="text-muted-foreground text-sm mt-3">
-            {isLogin ? 'Entre para acessar seus palpites' : 'Solicite seu acesso ao bolão'}
+            {forgotPassword ? 'Informe seu e-mail para recuperar a senha' : isLogin ? 'Entre para acessar seus palpites' : 'Solicite seu acesso ao bolão'}
           </p>
         </div>
 

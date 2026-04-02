@@ -466,8 +466,13 @@ export default function PredictionsPage() {
               const score = scores.get(match.id);
               const draft = getDraft(match.id);
               const changed = hasDraftChanged(match.id);
-              const partialPoints = !match.is_finished ? getPartialPoints(match, pred) : null;
+              const partialPoints = (!match.is_finished && match.is_started) ? getPartialPoints(match, pred) : null;
               const showExpandable = locked && !match.is_finished;
+
+              // Determine group label
+              const knockoutPhases = ['16-AVOS', 'OITAVAS', 'QUARTAS', 'SEMI', '3º e 4º', 'FINAL'];
+              const isKnockout = knockoutPhases.includes(match.group_name);
+              const groupLabel = isKnockout ? match.group_name : `Grupo ${match.group_name}`;
 
               return (
                 <div
@@ -484,11 +489,11 @@ export default function PredictionsPage() {
                   {/* Header */}
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                      Grupo {match.group_name} · {format(new Date(match.match_datetime), "dd MMM · HH:mm", { locale: ptBR })}
+                      {groupLabel} · {format(new Date(match.match_datetime), "dd MMM · HH:mm", { locale: ptBR })}
                     </span>
                     <div className="flex items-center gap-2">
                       {match.is_finished && score && <ScoreBadge points={score.points} />}
-                      {!match.is_finished && partialPoints !== null && <ScoreBadge points={partialPoints} />}
+                      {!match.is_finished && match.is_started && partialPoints !== null && <ScoreBadge points={partialPoints} />}
                       <MatchStatusBadge match={match} serverNow={serverNow} />
                       {!match.is_finished && !match.is_started && !locked && (
                         <CountdownTimer datetime={match.match_datetime} serverNow={serverNow} onExpired={handleTimerExpired} />
