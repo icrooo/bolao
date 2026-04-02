@@ -8,6 +8,7 @@ import { Loader2, Check, Lock, Minus, Plus, ChevronDown, ChevronUp } from 'lucid
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { getFlagUrl } from '@/lib/countryFlags';
 
 type Match = {
   id: string;
@@ -42,7 +43,21 @@ type AllPrediction = {
 
 type Profile = { user_id: string; name: string };
 
+const LOCK_MINUTES = 10;
 const FILTERS = ['PRÓXIMOS JOGOS', 'TODOS', 'GRUPOS'] as const;
+
+function CountryFlag({ name, side }: { name: string; side: 'home' | 'away' }) {
+  const url = getFlagUrl(name, 24);
+  if (!url) return null;
+  return (
+    <img
+      src={url}
+      alt={name}
+      className={`w-5 h-4 object-cover rounded-sm ${side === 'home' ? 'ml-1' : 'mr-1'}`}
+      loading="lazy"
+    />
+  );
+}
 
 function ScoreBadge({ points }: { points: number }) {
   const cls = points === 5 ? 'score-badge-5' : points === 2 ? 'score-badge-2' : points === -1 ? 'score-badge-negative' : 'score-badge-0';
@@ -68,7 +83,7 @@ function MatchStatusBadge({ match, serverNow }: { match: Match; serverNow: () =>
       </span>
     );
   }
-  const lockTime = new Date(match.match_datetime).getTime() - 30 * 60 * 1000;
+  const lockTime = new Date(match.match_datetime).getTime() - LOCK_MINUTES * 60 * 1000;
   if (serverNow() >= lockTime) {
     return (
       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-destructive/15 text-destructive flex items-center gap-1">
@@ -81,7 +96,7 @@ function MatchStatusBadge({ match, serverNow }: { match: Match; serverNow: () =>
 
 function CountdownTimer({ datetime, serverNow, onExpired }: { datetime: string; serverNow: () => number; onExpired?: () => void }) {
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const lockTime = new Date(new Date(datetime).getTime() - 30 * 60 * 1000);
+  const lockTime = new Date(new Date(datetime).getTime() - LOCK_MINUTES * 60 * 1000);
 
   useEffect(() => {
     const update = () => {
@@ -110,23 +125,23 @@ function CountdownTimer({ datetime, serverNow, onExpired }: { datetime: string; 
 
 function ScoreInput({ value, onChange, disabled }: { value: number; onChange: (v: number) => void; disabled: boolean }) {
   return (
-    <div className="flex items-center gap-1">
-      <button
-        type="button"
-        disabled={disabled || value <= 0}
-        onClick={() => onChange(Math.max(0, value - 1))}
-        className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform"
-      >
-        <Minus className="h-3 w-3" />
-      </button>
-      <span className="w-6 text-center font-bold tabular-nums">{value}</span>
+    <div className="flex flex-col items-center gap-0.5">
       <button
         type="button"
         disabled={disabled}
         onClick={() => onChange(value + 1)}
-        className="h-7 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform"
+        className="h-6 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform"
       >
         <Plus className="h-3 w-3" />
+      </button>
+      <span className="w-6 text-center font-bold tabular-nums">{value}</span>
+      <button
+        type="button"
+        disabled={disabled || value <= 0}
+        onClick={() => onChange(Math.max(0, value - 1))}
+        className="h-6 w-7 flex items-center justify-center rounded-md bg-secondary text-foreground disabled:opacity-30 active:scale-95 transition-transform"
+      >
+        <Minus className="h-3 w-3" />
       </button>
     </div>
   );
@@ -156,7 +171,6 @@ function ExpandablePredictions({
   const matchPreds = allPredictions.filter(p => p.match_id === match.id);
   const matchScores = allScores.filter(s => s.match_id === match.id);
 
-  // Build list: current user first, then alphabetical
   const entries = matchPreds.map(p => {
     const profile = allProfiles.find(pr => pr.user_id === p.user_id);
     const score = matchScores.find(s => s.user_id === p.user_id);
@@ -234,7 +248,6 @@ export default function PredictionsPage() {
   const [drafts, setDrafts] = useState<Map<string, { home: number; away: number }>>(new Map());
   const [, forceUpdate] = useState(0);
 
-  // All predictions & profiles for expandable view
   const [allPredictions, setAllPredictions] = useState<AllPrediction[]>([]);
   const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
   const [allScores, setAllScores] = useState<{ user_id: string; match_id: string; points: number }[]>([]);
@@ -305,10 +318,9 @@ export default function PredictionsPage() {
   };
 
   const isLocked = useCallback((match: Match) => {
-    return match.is_finished || match.is_started || new Date(match.match_datetime).getTime() - 30 * 60 * 1000 <= serverNow();
+    return match.is_finished || match.is_started || new Date(match.match_datetime).getTime() - LOCK_MINUTES * 60 * 1000 <= serverNow();
   }, [serverNow]);
 
-  // Force re-render to update locked state when timers expire
   const handleTimerExpired = useCallback(() => {
     forceUpdate(n => n + 1);
   }, []);
@@ -316,15 +328,40 @@ export default function PredictionsPage() {
   const filteredMatches = useMemo(() => {
     if (filter === 'PRÓXIMOS JOGOS') {
       const now = serverNow();
-      // Get current date at 4am to define "day boundary"
-      const today4am = new Date(now);
-      today4am.setHours(4, 0, 0, 0);
-      if (now < today4am.getTime()) today4am.setDate(today4am.getDate() - 1);
+      // Salvador timezone is UTC-3. Calculate 4AM today in Salvador.
+      const salvadorOffset = -3 * 60; // minutes
+      const utcNow = new Date(now);
+      // Current time in Salvador
+      const salvadorMs = now + salvadorOffset * 60 * 1000;
+      const salvadorDate = new Date(salvadorMs);
       
+      // Build today's 4AM in Salvador, then convert to UTC
+      const year = salvadorDate.getUTCFullYear();
+      const month = salvadorDate.getUTCMonth();
+      const day = salvadorDate.getUTCDate();
+      // 4AM Salvador = 7AM UTC (4 - (-3) = 7)
+      let cutoffUtc = new Date(Date.UTC(year, month, day, 7, 0, 0, 0));
+      // If we haven't passed this cutoff yet, go back one day
+      if (now < cutoffUtc.getTime()) {
+        cutoffUtc = new Date(cutoffUtc.getTime() - 24 * 60 * 60 * 1000);
+      }
+      const nextCutoffUtc = new Date(cutoffUtc.getTime() + 24 * 60 * 60 * 1000);
+
+      // Show matches from current cutoff window (today 4AM to tomorrow 4AM Salvador)
       const upcoming = matches
-        .filter(m => !m.is_finished && new Date(m.match_datetime).getTime() >= today4am.getTime())
-        .sort((a, b) => new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime())
-        .slice(0, 4);
+        .filter(m => {
+          const mt = new Date(m.match_datetime).getTime();
+          return !m.is_finished && mt >= cutoffUtc.getTime() && mt < nextCutoffUtc.getTime();
+        })
+        .sort((a, b) => new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime());
+      
+      // If no matches in current window, show next upcoming matches regardless of window
+      if (upcoming.length === 0) {
+        return matches
+          .filter(m => !m.is_finished && new Date(m.match_datetime).getTime() >= now)
+          .sort((a, b) => new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime())
+          .slice(0, 4);
+      }
       return upcoming;
     }
     if (filter === 'GRUPOS') {
@@ -460,9 +497,10 @@ export default function PredictionsPage() {
                   </div>
 
                   {/* Teams + Scores */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 text-right">
-                      <p className="font-medium text-sm">{match.home_team}</p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center justify-end gap-1">
+                      <p className="font-medium text-sm text-right truncate">{match.home_team}</p>
+                      <CountryFlag name={match.home_team} side="home" />
                     </div>
                     <div className="flex items-center gap-2">
                       {match.is_finished || match.is_started ? (
@@ -476,15 +514,16 @@ export default function PredictionsPage() {
                           <span className="text-muted-foreground text-xs">—</span>
                         </div>
                       ) : (
-                        <>
+                        <div className="flex items-center gap-2">
                           <ScoreInput value={draft.home} onChange={v => setDraft(match.id, v, draft.away)} disabled={locked} />
                           <span className="text-muted-foreground text-xs">×</span>
                           <ScoreInput value={draft.away} onChange={v => setDraft(match.id, draft.home, v)} disabled={locked} />
-                        </>
+                        </div>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{match.away_team}</p>
+                    <div className="flex-1 flex items-center gap-1">
+                      <CountryFlag name={match.away_team} side="away" />
+                      <p className="font-medium text-sm truncate">{match.away_team}</p>
                     </div>
                   </div>
 
@@ -522,7 +561,7 @@ export default function PredictionsPage() {
                     </div>
                   )}
 
-                  {/* Expandable predictions for locked/in-progress matches */}
+                  {/* Expandable predictions for locked/in-progress/finished matches */}
                   {(showExpandable || match.is_finished) && user && (
                     <ExpandablePredictions
                       match={match}

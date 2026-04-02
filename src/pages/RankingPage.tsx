@@ -87,7 +87,8 @@ export default function RankingPage() {
         if (b.total_points !== a.total_points) return b.total_points - a.total_points;
         if (b.exact_count !== a.exact_count) return b.exact_count - a.exact_count;
         if (b.partial_count !== a.partial_count) return b.partial_count - a.partial_count;
-        return a.negative_count - b.negative_count;
+        if (a.negative_count !== b.negative_count) return a.negative_count - b.negative_count;
+        return a.name.localeCompare(b.name);
       });
       for (let i = 0; i < sorted.length; i++) {
         if (i > 0) {
