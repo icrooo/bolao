@@ -42,8 +42,7 @@ export default function AuthPage() {
     );
   }
 
-  const [forgotPassword, setForgotPassword] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
