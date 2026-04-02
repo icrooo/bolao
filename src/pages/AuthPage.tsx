@@ -97,53 +97,93 @@ export default function AuthPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="glass-card p-6 space-y-4">
-          {!isLogin && (
+        {forgotPassword ? (
+          <form onSubmit={handleResetPassword} className="glass-card p-6 space-y-4">
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Nome</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Email</label>
               <Input
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="Seu nome"
-                required={!isLogin}
+                type="email"
+                value={resetEmail}
+                onChange={e => setResetEmail(e.target.value)}
+                placeholder="seu@email.com"
+                required
               />
             </div>
-          )}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Email</label>
-            <Input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="seu@email.com"
-              required
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Senha</label>
-            <Input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••"
-              required
-              minLength={6}
-            />
-          </div>
-          <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            {isLogin ? 'Entrar' : 'Solicitar acesso'}
-          </Button>
-        </form>
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Enviar e-mail de recuperação
+            </Button>
+          </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="glass-card p-6 space-y-4">
+            {!isLogin && (
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Nome</label>
+                <Input
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="Seu nome"
+                  required={!isLogin}
+                />
+              </div>
+            )}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Email</label>
+              <Input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Senha</label>
+              <Input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••"
+                required
+                minLength={6}
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {isLogin ? 'Entrar' : 'Solicitar acesso'}
+            </Button>
+            {isLogin && (
+              <button
+                type="button"
+                onClick={() => setForgotPassword(true)}
+                className="text-xs text-muted-foreground hover:underline w-full text-center"
+              >
+                Esqueceu sua senha?
+              </button>
+            )}
+          </form>
+        )}
 
         <p className="text-center text-sm text-muted-foreground mt-4">
-          {isLogin ? 'Não tem conta?' : 'Já tem conta?'}{' '}
-          <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-primary font-medium hover:underline"
-          >
-            {isLogin ? 'Solicitar acesso' : 'Fazer login'}
-          </button>
+          {forgotPassword ? (
+            <button onClick={() => setForgotPassword(false)} className="text-primary font-medium hover:underline">
+              Voltar ao login
+            </button>
+          ) : isLogin ? (
+            <>
+              Primeira vez por aqui?{' '}
+              <button onClick={() => setIsLogin(false)} className="text-primary font-medium hover:underline">
+                Solicite acesso :)
+              </button>
+            </>
+          ) : (
+            <>
+              Já tem conta?{' '}
+              <button onClick={() => setIsLogin(true)} className="text-primary font-medium hover:underline">
+                Fazer login
+              </button>
+            </>
+          )}
         </p>
       </div>
     </div>
