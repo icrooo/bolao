@@ -14,6 +14,8 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [forgotPassword, setForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
 
   if (loading) {
     return (
