@@ -146,10 +146,11 @@ export default function RankingPage() {
     setLoading(false);
   };
 
-  const getMedalEmoji = (pos: number) => {
+  const getMedalEmoji = (pos: number, isLast: boolean) => {
     if (pos === 1) return '🥇';
     if (pos === 2) return '🥈';
     if (pos === 3) return '🥉';
+    if (isLast) return '💩';
     return null;
   };
 
@@ -208,7 +209,8 @@ export default function RankingPage() {
         ) : (
           <div className="space-y-2">
             {ranking.map((entry, i) => {
-              const medal = getMedalEmoji(entry.position);
+              const isLastPosition = ranking.length > 1 && entry.position === ranking[ranking.length - 1].position;
+              const medal = getMedalEmoji(entry.position, isLastPosition);
               return (
                 <div
                   key={entry.user_id}

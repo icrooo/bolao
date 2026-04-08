@@ -106,7 +106,7 @@ export default function AllPredictionsPage() {
           <table className="w-full text-xs">
             <thead>
               <tr>
-                <th className="sticky left-0 bg-background z-10 text-left py-2 pr-2 font-medium text-muted-foreground">Nome</th>
+                <th className="sticky left-0 bg-background z-10 text-left py-2 pr-2 font-medium text-muted-foreground min-w-[100px]">Nome</th>
                 {visibleMatches.map(m => (
                   <th key={m.id} className="text-center px-1 py-2 font-normal">
                     <div className="text-[9px] text-muted-foreground whitespace-nowrap">
@@ -119,7 +119,9 @@ export default function AllPredictionsPage() {
             <tbody>
               {profiles.map((profile, i) => (
                 <tr key={profile.user_id} className="animate-reveal-up" style={{ animationDelay: `${Math.min(i * 40, 200)}ms` }}>
-                  <td className="sticky left-0 bg-background z-10 py-1.5 pr-2 font-medium whitespace-nowrap">{profile.name}</td>
+                  <td className="sticky left-0 bg-background z-10 py-1.5 pr-2 font-medium whitespace-nowrap min-w-[100px]">
+                    <span className="bg-background pr-2">{profile.name}</span>
+                  </td>
                   {visibleMatches.map(match => {
                     const pred = getPrediction(profile.user_id, match.id);
                     const points = getPointsForCell(profile.user_id, match);
