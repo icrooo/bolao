@@ -424,7 +424,6 @@ export default function AdminPage() {
                         <p className="text-sm font-medium truncate">{m.home_team}</p>
                         {(() => { const url = getFlagUrl(m.home_team, 24); return url ? <img src={url} alt={m.home_team} className="w-5 h-4 object-cover rounded-sm" /> : null; })()}
                       </div>
-                      </div>
                       <div className="flex items-center gap-1">
                         {m.is_started ? (
                           <>
@@ -463,7 +462,6 @@ export default function AdminPage() {
                       <div className="flex-1 flex items-center gap-1">
                         {(() => { const url = getFlagUrl(m.away_team, 24); return url ? <img src={url} alt={m.away_team} className="w-5 h-4 object-cover rounded-sm" /> : null; })()}
                         <p className="text-sm font-medium truncate">{m.away_team}</p>
-                      </div>
                       </div>
                     </div>
 
