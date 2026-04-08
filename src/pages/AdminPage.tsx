@@ -11,10 +11,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Trophy, Trash2, Pencil, X, Play, Minus, Check } from 'lucide-react';
+import { Loader2, Plus, Trophy, Trash2, Pencil, X, Play, Minus, Check, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { getFlagUrl } from '@/lib/countryFlags';
 
 type Profile = { id: string; user_id: string; name: string; email: string | null; is_approved: boolean; created_at: string };
 type Match = {
@@ -188,6 +189,15 @@ export default function AdminPage() {
     await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
     toast.success('Jogo iniciado!');
     setStartingMatch(null);
+    fetchData();
+  };
+
+  const restartMatch = async (matchId: string) => {
+    if (!window.confirm('Reiniciar este jogo? O placar será zerado e o jogo voltará ao estado "não iniciado". As pontuações serão removidas.')) return;
+    await supabase.from('scores').delete().eq('match_id', matchId);
+    const { error } = await supabase.from('matches').update({ is_started: false, is_finished: false, home_score: null, away_score: null }).eq('id', matchId);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Jogo reiniciado!');
     fetchData();
   };
 
