@@ -412,14 +412,18 @@ export default function AdminPage() {
                     <Button size="sm" onClick={() => saveEdit(m.id)} className="w-full active:scale-95">Salvar alterações</Button>
                   </div>
                 ) : m.is_finished ? (
-                  <p className="font-medium text-sm text-center">
-                    {m.home_team} {m.home_score} × {m.away_score} {m.away_team}
-                  </p>
+                  <div className="flex items-center justify-center gap-2">
+                    {(() => { const url = getFlagUrl(m.home_team, 24); return url ? <img src={url} alt={m.home_team} className="w-5 h-4 object-cover rounded-sm" /> : null; })()}
+                    <span className="font-medium text-sm">{m.home_team} {m.home_score} × {m.away_score} {m.away_team}</span>
+                    {(() => { const url = getFlagUrl(m.away_team, 24); return url ? <img src={url} alt={m.away_team} className="w-5 h-4 object-cover rounded-sm" /> : null; })()}
+                  </div>
                 ) : (
                   <>
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex-1 text-right">
+                      <div className="flex-1 flex items-center justify-end gap-1">
                         <p className="text-sm font-medium truncate">{m.home_team}</p>
+                        {(() => { const url = getFlagUrl(m.home_team, 24); return url ? <img src={url} alt={m.home_team} className="w-5 h-4 object-cover rounded-sm" /> : null; })()}
+                      </div>
                       </div>
                       <div className="flex items-center gap-1">
                         {m.is_started ? (
@@ -456,8 +460,10 @@ export default function AdminPage() {
                           <span className="text-muted-foreground text-sm">—</span>
                         )}
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 flex items-center gap-1">
+                        {(() => { const url = getFlagUrl(m.away_team, 24); return url ? <img src={url} alt={m.away_team} className="w-5 h-4 object-cover rounded-sm" /> : null; })()}
                         <p className="text-sm font-medium truncate">{m.away_team}</p>
+                      </div>
                       </div>
                     </div>
 
@@ -468,10 +474,16 @@ export default function AdminPage() {
                           {startingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Play className="h-3 w-3 mr-1" /> Iniciar jogo</>}
                         </Button>
                       ) : (
-                        <Button size="sm" variant="outline" onClick={() => setConfirmFinish(m.id)} disabled={finishingMatch === m.id}
-                          className="flex-1 text-xs active:scale-95">
-                          {finishingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '🏁 Encerrar'}
-                        </Button>
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => restartMatch(m.id)}
+                            className="flex-1 text-xs active:scale-95">
+                            <RotateCcw className="h-3 w-3 mr-1" /> Reiniciar
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setConfirmFinish(m.id)} disabled={finishingMatch === m.id}
+                            className="flex-1 text-xs active:scale-95">
+                            {finishingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '🏁 Encerrar'}
+                          </Button>
+                        </>
                       )}
                     </div>
                   </>
