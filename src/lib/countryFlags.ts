@@ -232,10 +232,9 @@ export function getFlagUrl(countryName: string, size: 16 | 24 | 32 | 48 | 64 = 3
   const code = getCountryCode(countryName);
   if (!code) return null;
   // flagsapi.com doesn't support sub-national codes like GB-ENG, GB-SCT, GB-WLS
-  // Use flagcdn.com for those
+  // Use the UK flag for these since sub-national flags aren't reliably available
   if (code.startsWith('GB-')) {
-    const sub = code.split('-')[1].toLowerCase();
-    return `https://flagcdn.com/w${size}/${sub}.png`;
+    return `https://flagsapi.com/GB/flat/${size}.png`;
   }
   return `https://flagsapi.com/${code}/flat/${size}.png`;
 }

@@ -9,6 +9,7 @@ import PredictionsPage from "./pages/PredictionsPage";
 import RankingPage from "./pages/RankingPage";
 import AllPredictionsPage from "./pages/AllPredictionsPage";
 import AdminPage from "./pages/AdminPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/ranking" element={<ProtectedRoute><RankingPage /></ProtectedRoute>} />
             <Route path="/all-predictions" element={<ProtectedRoute><AllPredictionsPage /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminPage /></AdminRoute></ProtectedRoute>} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

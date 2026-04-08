@@ -365,7 +365,13 @@ export default function PredictionsPage() {
       return upcoming;
     }
     if (filter === 'GRUPOS') {
-      return [...matches].sort((a, b) => a.group_name.localeCompare(b.group_name) || new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime());
+      const knockoutOrder = ['16-AVOS', 'OITAVAS', 'QUARTAS', 'SEMI', '3º e 4º', 'FINAL'];
+      const getGroupOrder = (name: string) => {
+        const ki = knockoutOrder.indexOf(name);
+        if (ki !== -1) return `ZZ_${ki.toString().padStart(2, '0')}`;
+        return name;
+      };
+      return [...matches].sort((a, b) => getGroupOrder(a.group_name).localeCompare(getGroupOrder(b.group_name)) || new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime());
     }
     return matches;
   }, [matches, filter, serverNow]);
