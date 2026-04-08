@@ -103,10 +103,10 @@ export default function AllPredictionsPage() {
         <p className="text-xs text-muted-foreground">Palpites de todos os participantes para jogos bloqueados, em andamento e finalizados</p>
 
         <div className="overflow-x-auto -mx-4 px-4">
-          <table className="w-full text-xs">
+          <table className="w-full text-xs border-collapse">
             <thead>
               <tr>
-                <th className="sticky left-0 bg-background z-10 text-left py-2 pr-2 font-medium text-muted-foreground min-w-[100px]">Nome</th>
+                <th className="sticky left-0 z-20 text-left py-2 pr-2 font-medium text-muted-foreground min-w-[100px] bg-background after:content-[''] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border relative">Nome</th>
                 {visibleMatches.map(m => (
                   <th key={m.id} className="text-center px-1 py-2 font-normal">
                     <div className="text-[9px] text-muted-foreground whitespace-nowrap">
@@ -119,8 +119,8 @@ export default function AllPredictionsPage() {
             <tbody>
               {profiles.map((profile, i) => (
                 <tr key={profile.user_id} className="animate-reveal-up" style={{ animationDelay: `${Math.min(i * 40, 200)}ms` }}>
-                  <td className="sticky left-0 bg-background z-10 py-1.5 pr-2 font-medium whitespace-nowrap min-w-[100px]">
-                    <span className="bg-background pr-2">{profile.name}</span>
+                  <td className="sticky left-0 z-20 py-1.5 pr-2 font-medium whitespace-nowrap min-w-[100px] bg-background after:content-[''] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border relative">
+                    {profile.name}
                   </td>
                   {visibleMatches.map(match => {
                     const pred = getPrediction(profile.user_id, match.id);
