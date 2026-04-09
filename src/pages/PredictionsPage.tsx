@@ -213,26 +213,26 @@ function ExpandablePredictions({
               if (pts === -1) return 'bg-score-negative text-destructive-foreground';
               return 'bg-score-miss text-primary-foreground';
             };
-            const getScoreText = (pts: number | null) => {
+            const getScoreEmoji = (pts: number | null) => {
               if (pts === null) return '';
-              if (pts === 5) return 'brocandooo';
-              if (pts === 2) return 'tá quaseee';
-              if (pts === 0) return 'na torcida ainda';
-              if (pts === -1) return 'KKKKKKK';
+              if (pts === 5) return '🔥';
+              if (pts === 2) return '👀';
+              if (pts === 0) return '🤞';
+              if (pts === -1) return '🤣';
               return '';
             };
-            const scoreText = getScoreText(e.points);
+            const emoji = getScoreEmoji(e.points);
             return (
               <div key={e.user_id} className={`flex items-center justify-between px-3 py-1.5 rounded-md text-xs ${e.user_id === currentUserId ? 'bg-primary/5 font-semibold' : 'bg-secondary/50'}`}>
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <span className="truncate">{e.name}</span>
-                  {scoreText && (
-                    <span className="italic text-muted-foreground text-[10px] shrink-0">{scoreText}</span>
-                  )}
                 </div>
-                <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${getColor(e.points)}`}>
-                  {e.home_score_pred}×{e.away_score_pred}
-                </span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${getColor(e.points)}`}>
+                    {e.home_score_pred}×{e.away_score_pred}
+                  </span>
+                  {emoji && <span className="text-sm">{emoji}</span>}
+                </div>
               </div>
             );
           })}

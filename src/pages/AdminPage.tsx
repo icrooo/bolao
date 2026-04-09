@@ -414,9 +414,11 @@ export default function AdminPage() {
                 ) : m.is_finished ? (
                   <div className="space-y-3">
                     <div className="flex items-center justify-center gap-2">
+                      <span className="font-medium text-sm">{m.home_team}</span>
                       {(() => { const url = getFlagUrl(m.home_team, 24); return url ? <img src={url} alt={m.home_team} className="w-5 h-4 object-cover rounded-sm" /> : null; })()}
-                      <span className="font-medium text-sm">{m.home_team} {m.home_score} × {m.away_score} {m.away_team}</span>
+                      <span className="font-bold tabular-nums">{m.home_score} × {m.away_score}</span>
                       {(() => { const url = getFlagUrl(m.away_team, 24); return url ? <img src={url} alt={m.away_team} className="w-5 h-4 object-cover rounded-sm" /> : null; })()}
+                      <span className="font-medium text-sm">{m.away_team}</span>
                     </div>
                     <Button size="sm" variant="outline" onClick={() => restartMatch(m.id)}
                       className="w-full text-xs active:scale-95">
