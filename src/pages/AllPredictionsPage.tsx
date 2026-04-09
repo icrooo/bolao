@@ -145,7 +145,7 @@ export default function AllPredictionsPage() {
     return (
       <AppLayout>
         <div className="glass-card p-8 text-center">
-          <p className="text-muted-foreground text-sm">Nenhum jogo bloqueado ou finalizado ainda</p>
+          <p className="text-muted-foreground text-sm">Oxen. Aguarde, ansioso.</p>
         </div>
       </AppLayout>
     );
