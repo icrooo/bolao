@@ -213,19 +213,26 @@ function ExpandablePredictions({
               if (pts === -1) return 'bg-score-negative text-destructive-foreground';
               return 'bg-score-miss text-primary-foreground';
             };
+            const getScoreText = (pts: number | null) => {
+              if (pts === null) return '';
+              if (pts === 5) return 'brocandooo';
+              if (pts === 2) return 'tá quaseee';
+              if (pts === 0) return 'na torcida ainda';
+              if (pts === -1) return 'KKKKKKK';
+              return '';
+            };
+            const scoreText = getScoreText(e.points);
             return (
               <div key={e.user_id} className={`flex items-center justify-between px-3 py-1.5 rounded-md text-xs ${e.user_id === currentUserId ? 'bg-primary/5 font-semibold' : 'bg-secondary/50'}`}>
-                <span className="truncate flex-1">{e.name}</span>
-                <div className="flex items-center gap-2">
-                  <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${getColor(e.points)}`}>
-                    {e.home_score_pred}×{e.away_score_pred}
-                  </span>
-                  {e.points !== null && (
-                    <span className="text-[10px] font-bold tabular-nums w-8 text-right">
-                      {e.points > 0 ? '+' : ''}{e.points}
-                    </span>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="truncate">{e.name}</span>
+                  {scoreText && (
+                    <span className="italic text-muted-foreground text-[10px] shrink-0">{scoreText}</span>
                   )}
                 </div>
+                <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${getColor(e.points)}`}>
+                  {e.home_score_pred}×{e.away_score_pred}
+                </span>
               </div>
             );
           })}
@@ -347,18 +354,18 @@ export default function PredictionsPage() {
       }
       const nextCutoffUtc = new Date(cutoffUtc.getTime() + 24 * 60 * 60 * 1000);
 
-      // Show matches from current cutoff window (today 4AM to tomorrow 4AM Salvador)
+      // Show matches from current cutoff window (today 4AM to tomorrow 4AM Salvador), including finished
       const upcoming = matches
         .filter(m => {
           const mt = new Date(m.match_datetime).getTime();
-          return !m.is_finished && mt >= cutoffUtc.getTime() && mt < nextCutoffUtc.getTime();
+          return mt >= cutoffUtc.getTime() && mt < nextCutoffUtc.getTime();
         })
         .sort((a, b) => new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime());
       
-      // If no matches in current window, show next upcoming matches regardless of window
+      // If no matches in current window, show next 4 upcoming matches regardless of window
       if (upcoming.length === 0) {
         return matches
-          .filter(m => !m.is_finished && new Date(m.match_datetime).getTime() >= now)
+          .filter(m => new Date(m.match_datetime).getTime() >= cutoffUtc.getTime())
           .sort((a, b) => new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime())
           .slice(0, 4);
       }
