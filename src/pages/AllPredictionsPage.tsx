@@ -1,10 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useServerTime } from '@/hooks/useServerTime';
 import { AppLayout } from '@/components/AppLayout';
 import { Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 type Profile = { user_id: string; name: string };
 type Match = { id: string; home_team: string; away_team: string; match_datetime: string; is_finished: boolean; is_started: boolean; home_score: number | null; away_score: number | null };
@@ -19,26 +17,35 @@ export default function AllPredictionsPage() {
   const [scores, setScores] = useState<Score[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchAll = async () => {
+    const [profRes, matchRes, predRes, scoreRes] = await Promise.all([
+      supabase.from('profiles').select('user_id, name').eq('is_approved', true),
+      supabase.from('matches').select('id, home_team, away_team, match_datetime, is_finished, is_started, home_score, away_score').order('match_datetime'),
+      supabase.from('predictions').select('user_id, match_id, home_score_pred, away_score_pred'),
+      supabase.from('scores').select('user_id, match_id, points'),
+    ]);
+    if (profRes.data) setProfiles(profRes.data);
+    if (matchRes.data) setMatches(matchRes.data as Match[]);
+    if (predRes.data) setPredictions(predRes.data);
+    if (scoreRes.data) setScores(scoreRes.data);
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchAll(); }, []);
+
+  // Realtime subscription
   useEffect(() => {
-    const fetchAll = async () => {
-      const [profRes, matchRes, predRes, scoreRes] = await Promise.all([
-        supabase.from('profiles').select('user_id, name').eq('is_approved', true),
-        supabase.from('matches').select('id, home_team, away_team, match_datetime, is_finished, is_started, home_score, away_score').order('match_datetime'),
-        supabase.from('predictions').select('user_id, match_id, home_score_pred, away_score_pred'),
-        supabase.from('scores').select('user_id, match_id, points'),
-      ]);
-      if (profRes.data) setProfiles(profRes.data);
-      if (matchRes.data) setMatches(matchRes.data as Match[]);
-      if (predRes.data) setPredictions(predRes.data);
-      if (scoreRes.data) setScores(scoreRes.data);
-      setLoading(false);
-    };
-    fetchAll();
+    const channel = supabase
+      .channel('all-predictions-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, () => fetchAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => fetchAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, () => fetchAll())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // Show matches that are locked (30min before), started, or finished
   const isLocked = (m: Match) => {
-    return m.is_finished || m.is_started || new Date(m.match_datetime).getTime() - 30 * 60 * 1000 <= serverNow();
+    return m.is_finished || m.is_started || new Date(m.match_datetime).getTime() - 10 * 60 * 1000 <= serverNow();
   };
 
   const visibleMatches = matches.filter(isLocked);
@@ -66,16 +73,63 @@ export default function AllPredictionsPage() {
   };
 
   const getPointsForCell = (userId: string, match: Match) => {
-    // If finished, use stored score
     const storedScore = getScore(userId, match.id);
     if (storedScore) return storedScore.points;
-    // If in progress with scores, calculate partial
     const pred = getPrediction(userId, match.id);
     if (pred && match.home_score !== null && match.away_score !== null) {
       return calcPoints(pred, match.home_score, match.away_score);
     }
     return null;
   };
+
+  // Calculate ranking positions (same logic as RankingPage)
+  const rankingMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const userScores = new Map<string, { total: number; exact: number; tendency: number; inverse: number; name: string }>();
+
+    profiles.forEach(p => {
+      userScores.set(p.user_id, { total: 0, exact: 0, tendency: 0, inverse: 0, name: p.name });
+    });
+
+    scores.forEach(s => {
+      const entry = userScores.get(s.user_id);
+      if (entry) {
+        entry.total += s.points;
+        if (s.points === 5) entry.exact++;
+        if (s.points === 2) entry.tendency++;
+        if (s.points === -1) entry.inverse++;
+      }
+    });
+
+    const sorted = Array.from(userScores.entries())
+      .sort(([, a], [, b]) => {
+        if (b.total !== a.total) return b.total - a.total;
+        if (b.exact !== a.exact) return b.exact - a.exact;
+        if (b.tendency !== a.tendency) return b.tendency - a.tendency;
+        if (a.inverse !== b.inverse) return a.inverse - b.inverse;
+        return a.name.localeCompare(b.name);
+      });
+
+    let pos = 1;
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0) {
+        const prev = sorted[i - 1][1];
+        const curr = sorted[i][1];
+        if (curr.total !== prev.total || curr.exact !== prev.exact || curr.tendency !== prev.tendency || curr.inverse !== prev.inverse) {
+          pos = i + 1;
+        }
+      }
+      map.set(sorted[i][0], pos);
+    }
+
+    return map;
+  }, [profiles, scores]);
+
+  // Sort profiles alphabetically
+  const sortedProfiles = useMemo(() => 
+    [...profiles].sort((a, b) => a.name.localeCompare(b.name)),
+    [profiles]
+  );
 
   if (loading) {
     return (
@@ -103,12 +157,12 @@ export default function AllPredictionsPage() {
         <p className="text-xs text-muted-foreground">Palpites de todos os participantes para jogos bloqueados, em andamento e finalizados</p>
 
         <div className="overflow-x-auto -mx-4 px-4">
-          <table className="w-full text-xs border-collapse">
+          <table className="text-xs border-collapse">
             <thead>
               <tr>
-                <th className="sticky left-0 z-20 text-left py-2 pr-2 font-medium text-muted-foreground min-w-[100px] bg-background after:content-[''] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border relative">Nome</th>
+                <th className="sticky left-0 z-20 text-left py-2 pr-1 font-medium text-muted-foreground min-w-[100px] bg-background">Nome</th>
                 {visibleMatches.map(m => (
-                  <th key={m.id} className="text-center px-1 py-2 font-normal">
+                  <th key={m.id} className="text-center px-0.5 py-2 font-normal">
                     <div className="text-[9px] text-muted-foreground whitespace-nowrap">
                       {m.home_team.slice(0, 3).toUpperCase()}×{m.away_team.slice(0, 3).toUpperCase()}
                     </div>
@@ -117,25 +171,28 @@ export default function AllPredictionsPage() {
               </tr>
             </thead>
             <tbody>
-              {profiles.map((profile, i) => (
-                <tr key={profile.user_id} className="animate-reveal-up" style={{ animationDelay: `${Math.min(i * 40, 200)}ms` }}>
-                  <td className="sticky left-0 z-20 py-1.5 pr-2 font-medium whitespace-nowrap min-w-[100px] bg-background after:content-[''] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border relative">
-                    {profile.name}
-                  </td>
-                  {visibleMatches.map(match => {
-                    const pred = getPrediction(profile.user_id, match.id);
-                    const points = getPointsForCell(profile.user_id, match);
-                    if (!pred) return <td key={match.id} className="text-center px-1 py-1.5"><span className="text-muted-foreground">—</span></td>;
-                    return (
-                      <td key={match.id} className="text-center px-1 py-1.5">
-                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${points !== null ? getScoreColor(points) : 'bg-secondary'}`}>
-                          {pred.home_score_pred}×{pred.away_score_pred}
-                        </span>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+              {sortedProfiles.map((profile, i) => {
+                const rank = rankingMap.get(profile.user_id);
+                return (
+                  <tr key={profile.user_id} className="animate-reveal-up" style={{ animationDelay: `${Math.min(i * 40, 200)}ms` }}>
+                    <td className="sticky left-0 z-20 py-1.5 pr-1 font-medium whitespace-nowrap min-w-[100px] bg-background">
+                      {profile.name} <span className="text-muted-foreground font-normal">[{rank ?? '-'}]</span>
+                    </td>
+                    {visibleMatches.map(match => {
+                      const pred = getPrediction(profile.user_id, match.id);
+                      const points = getPointsForCell(profile.user_id, match);
+                      if (!pred) return <td key={match.id} className="text-center px-0.5 py-1.5"><span className="text-muted-foreground">—</span></td>;
+                      return (
+                        <td key={match.id} className="text-center px-0.5 py-1.5">
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${points !== null ? getScoreColor(points) : 'bg-secondary'}`}>
+                            {pred.home_score_pred}×{pred.away_score_pred}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
