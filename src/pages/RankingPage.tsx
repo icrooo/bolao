@@ -16,6 +16,7 @@ type RankingEntry = {
   exact_count: number;
   partial_count: number;
   negative_count: number;
+  missed_count: number;
   position: number;
   positionChange: number | null;
 };
@@ -60,7 +61,6 @@ export default function RankingPage() {
     const { data: profiles } = await supabase.from('profiles').select('user_id, name').eq('is_approved', true);
     if (!profiles) { setLoading(false); return; }
 
-    // Filter by friendship group
     let filteredProfiles = profiles;
     if (selectedGroup !== 'all') {
       const groupUserIds = new Set(userFriendshipGroups.filter(ufg => ufg.group_id === selectedGroup).map(ufg => ufg.user_id));
@@ -69,7 +69,11 @@ export default function RankingPage() {
 
     const { data: finishedMatches } = await supabase.from('matches').select('id, match_datetime').eq('is_finished', true).order('match_datetime', { ascending: false });
 
+    // Fetch predictions to calculate missed matches
+    const { data: predictionsData } = await supabase.from('predictions').select('user_id, match_id');
+
     let scoresQuery = supabase.from('scores').select('user_id, match_id, points');
+    let relevantFinishedMatchIds: string[] = finishedMatches?.map(m => m.id) ?? [];
 
     if (tab === 'dia') {
       const dayStart = new Date(selectedDate);
@@ -80,17 +84,32 @@ export default function RankingPage() {
         .gte('match_datetime', dayStart.toISOString()).lte('match_datetime', dayEnd.toISOString());
       if (!dayMatches || dayMatches.length === 0) { setRanking([]); setLoading(false); return; }
       scoresQuery = scoresQuery.in('match_id', dayMatches.map(m => m.id));
+      // For daily view, only count finished matches of that day
+      const dayMatchIds = new Set(dayMatches.map(m => m.id));
+      relevantFinishedMatchIds = relevantFinishedMatchIds.filter(id => dayMatchIds.has(id));
     }
 
     const { data: scoresData } = await scoresQuery;
     if (!scoresData) { setLoading(false); return; }
 
+    // Build a set of predictions per user
+    const userPredictions = new Map<string, Set<string>>();
+    predictionsData?.forEach(p => {
+      if (!userPredictions.has(p.user_id)) userPredictions.set(p.user_id, new Set());
+      userPredictions.get(p.user_id)!.add(p.match_id);
+    });
+
+    const finishedMatchIdSet = new Set(relevantFinishedMatchIds);
+
     const buildRanking = (scores: typeof scoresData, profs: typeof filteredProfiles) => {
       const userMap = new Map<string, RankingEntry>();
       profs.forEach(p => {
+        // Count missed: finished matches where user has no prediction
+        const userPreds = userPredictions.get(p.user_id) ?? new Set();
+        const missed = relevantFinishedMatchIds.filter(mId => !userPreds.has(mId)).length;
         userMap.set(p.user_id, {
           user_id: p.user_id, name: p.name,
-          total_points: 0, exact_count: 0, partial_count: 0, negative_count: 0,
+          total_points: 0, exact_count: 0, partial_count: 0, negative_count: 0, missed_count: missed,
           position: 0, positionChange: null,
         });
       });
@@ -171,7 +190,6 @@ export default function RankingPage() {
           ))}
         </div>
 
-        {/* Friendship group filter */}
         <Select value={selectedGroup} onValueChange={setSelectedGroup}>
           <SelectTrigger className="h-8 text-xs">
             <SelectValue placeholder="Filtrar por grupo" />
@@ -211,29 +229,48 @@ export default function RankingPage() {
             {ranking.map((entry, i) => {
               const isLastPosition = ranking.length > 1 && entry.position === ranking[ranking.length - 1].position;
               const medal = getMedalEmoji(entry.position, isLastPosition);
+              const isMe = entry.user_id === user?.id;
               return (
                 <div
                   key={entry.user_id}
                   className={`glass-card p-3 flex items-center gap-3 animate-reveal-up ${
-                    entry.user_id === user?.id ? 'ring-2 ring-primary bg-primary/5' : ''
+                    isMe ? 'ring-2 ring-primary bg-primary/5' : ''
                   }`}
                   style={{ animationDelay: `${Math.min(i * 50, 300)}ms` }}
                 >
-                  <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                  <div className={`${medal ? 'w-10 h-10' : 'w-9 h-9'} rounded-full bg-secondary flex items-center justify-center shrink-0`}>
                     {medal ? (
-                      <span className="text-sm">{medal}</span>
+                      <span className={`${entry.position <= 3 ? 'text-xl' : 'text-lg'}`}>{medal}</span>
                     ) : (
-                      <span className="text-xs font-bold text-muted-foreground">{entry.position}</span>
+                      <span className="text-sm font-bold text-muted-foreground">{entry.position}º</span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{entry.name}</p>
-                    <div className="flex gap-2 mt-0.5">
-                      <span className="text-[10px] text-score-exact font-medium">{entry.exact_count}×5</span>
-                      <span className="text-[10px] text-score-partial font-medium">{entry.partial_count}×2</span>
-                      {entry.negative_count > 0 && (
-                        <span className="text-[10px] text-score-negative font-medium">{entry.negative_count}×(-1)</span>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-medium text-sm truncate">{entry.name}</p>
+                      {isMe && (
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 shrink-0">
+                          Você
+                        </span>
                       )}
+                    </div>
+                    <div className="flex gap-3 mt-1">
+                      <div className="flex flex-col items-center">
+                        <span className="text-xs font-bold text-green-600">{entry.exact_count}</span>
+                        <span className="text-[8px] text-muted-foreground leading-tight">+5</span>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xs font-bold text-yellow-600">{entry.partial_count}</span>
+                        <span className="text-[8px] text-muted-foreground leading-tight">+2</span>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xs font-bold text-destructive">{entry.negative_count}</span>
+                        <span className="text-[8px] text-muted-foreground leading-tight">-1</span>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xs font-bold text-muted-foreground">{entry.missed_count}</span>
+                        <span className="text-[8px] text-muted-foreground leading-tight">esqueceu</span>
+                      </div>
                     </div>
                   </div>
                   <div className="text-right flex items-center gap-2">

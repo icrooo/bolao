@@ -176,7 +176,7 @@ export default function AllPredictionsPage() {
                 return (
                   <tr key={profile.user_id} className="animate-reveal-up" style={{ animationDelay: `${Math.min(i * 40, 200)}ms` }}>
                     <td className="sticky left-0 z-20 py-1.5 pr-1 font-medium whitespace-nowrap min-w-[100px] bg-background">
-                      {profile.name} <span className="text-muted-foreground font-normal">[{rank ?? '-'}]</span>
+                      {profile.name} <span className="text-muted-foreground font-normal">[{rank ? `${rank}º` : '-'}]</span>
                     </td>
                     {visibleMatches.map(match => {
                       const pred = getPrediction(profile.user_id, match.id);
