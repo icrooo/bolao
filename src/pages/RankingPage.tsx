@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/AppLayout';
-import { Loader2, ChevronLeft, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
