@@ -231,7 +231,7 @@ export default function RankingPage() {
               <span>+5 = <span className="font-bold text-green-600">EXATO</span></span>
               <span>+2 = <span className="font-bold text-yellow-600">QUASE</span></span>
               <span>-1 = <span className="font-bold text-destructive">INVERSO</span></span>
-              <span>0 = <span className="font-bold">ESQUECEU</span></span>
+              <span>😩 = <span className="font-bold">ESQUECEU</span></span>
             </div>
             {ranking.map((entry, i) => {
               const isLastPosition = ranking.length > 1 && entry.position === ranking[ranking.length - 1].position;
