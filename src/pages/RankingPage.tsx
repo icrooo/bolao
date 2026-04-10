@@ -228,10 +228,10 @@ export default function RankingPage() {
           <div className="space-y-2">
             {/* Legend */}
             <div className="flex items-center justify-center gap-4 py-2 px-3 rounded-lg bg-secondary/50 text-[10px] text-muted-foreground">
-              <span><span className="font-bold text-green-600">N</span> = Exatos (+5)</span>
-              <span><span className="font-bold text-yellow-600">N</span> = Inexatos (+2)</span>
-              <span><span className="font-bold text-destructive">N</span> = Invertidos (-1)</span>
-              <span><span className="font-bold">N</span> 😩 = Esqueceu</span>
+              <span><span className="font-bold text-green-600">+5</span> = EXATO</span>
+              <span><span className="font-bold text-yellow-600">+2</span> = QUASE</span>
+              <span><span className="font-bold text-destructive">-1</span> = INVERSO</span>
+              <span><span className="font-bold">0</span> = Esqueceu</span>
             </div>
             {ranking.map((entry, i) => {
               const isLastPosition = ranking.length > 1 && entry.position === ranking[ranking.length - 1].position;
