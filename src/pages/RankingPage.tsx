@@ -245,8 +245,8 @@ export default function RankingPage() {
                       <span className="text-sm font-bold text-muted-foreground">{entry.position}º</span>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 shrink min-w-0">
                       <p className="font-medium text-sm truncate">{entry.name}</p>
                       {isMe && (
                         <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 shrink-0">
@@ -254,7 +254,7 @@ export default function RankingPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex gap-3 mt-1">
+                    <div className="flex gap-2 shrink-0 ml-auto mr-2">
                       <div className="flex flex-col items-center">
                         <span className="text-xs font-bold text-green-600">{entry.exact_count}</span>
                         <span className="text-[8px] text-muted-foreground leading-tight">+5</span>
@@ -269,7 +269,7 @@ export default function RankingPage() {
                       </div>
                       <div className="flex flex-col items-center">
                         <span className="text-xs font-bold text-muted-foreground">{entry.missed_count}</span>
-                        <span className="text-[8px] text-muted-foreground leading-tight">esqueceu</span>
+                        <span className="text-[8px] text-muted-foreground leading-tight">🚫</span>
                       </div>
                     </div>
                   </div>

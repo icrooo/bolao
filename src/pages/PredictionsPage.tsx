@@ -168,7 +168,8 @@ function ExpandablePredictions({
 }) {
   const [open, setOpen] = useState(false);
 
-  const matchPreds = allPredictions.filter(p => p.match_id === match.id);
+  const approvedUserIds = new Set(allProfiles.map(pr => pr.user_id));
+  const matchPreds = allPredictions.filter(p => p.match_id === match.id && approvedUserIds.has(p.user_id));
   const matchScores = allScores.filter(s => s.match_id === match.id);
 
   const entries = matchPreds.map(p => {
