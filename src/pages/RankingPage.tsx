@@ -229,9 +229,9 @@ export default function RankingPage() {
             {/* Legend */}
             <div className="flex items-center justify-center gap-4 py-2 px-3 rounded-lg bg-secondary/50 text-[10px] text-muted-foreground">
               <span>+5 = <span className="font-bold text-green-600">EXATO</span></span>
-              <span><span className="font-bold text-yellow-600">+2</span> = QUASE</span>
-              <span><span className="font-bold text-destructive">-1</span> = INVERSO</span>
-              <span><span className="font-bold">0</span> = Esqueceu</span>
+              <span>+2 = <span className="font-bold text-yellow-600">QUASE</span></span>
+              <span>-1 = <span className="font-bold text-destructive">INVERSO</span></span>
+              <span>0 = <span className="font-bold">ESQUECEU</span></span>
             </div>
             {ranking.map((entry, i) => {
               const isLastPosition = ranking.length > 1 && entry.position === ranking[ranking.length - 1].position;
