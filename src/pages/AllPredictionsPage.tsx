@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useServerTime } from '@/hooks/useServerTime';
+import { useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/AppLayout';
 import { Loader2 } from 'lucide-react';
 
@@ -11,6 +12,7 @@ type Score = { user_id: string; match_id: string; points: number };
 
 export default function AllPredictionsPage() {
   const { now: serverNow } = useServerTime();
+  const { user } = useAuth();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -125,10 +127,16 @@ export default function AllPredictionsPage() {
     return map;
   }, [profiles, scores]);
 
-  // Sort profiles alphabetically
+  // Sort profiles: logged-in user first, then alphabetically
   const sortedProfiles = useMemo(() => 
-    [...profiles].sort((a, b) => a.name.localeCompare(b.name)),
-    [profiles]
+    [...profiles].sort((a, b) => {
+      if (user) {
+        if (a.user_id === user.id) return -1;
+        if (b.user_id === user.id) return 1;
+      }
+      return a.name.localeCompare(b.name);
+    }),
+    [profiles, user]
   );
 
   if (loading) {
@@ -175,8 +183,8 @@ export default function AllPredictionsPage() {
                 const rank = rankingMap.get(profile.user_id);
                 return (
                   <tr key={profile.user_id} className="animate-reveal-up" style={{ animationDelay: `${Math.min(i * 40, 200)}ms` }}>
-                    <td className="sticky left-0 z-20 py-1.5 pr-1 font-medium whitespace-nowrap min-w-[100px] bg-background">
-                      {profile.name} <span className="text-muted-foreground font-normal">[{rank ? `${rank}º` : '-'}]</span>
+                    <td className="sticky left-0 z-20 py-1.5 pr-1 whitespace-nowrap min-w-[100px] bg-background">
+                      <span className={user && profile.user_id === user.id ? 'font-bold' : 'font-medium'}>{profile.name}</span> <span className="text-muted-foreground font-normal">[{rank ? `${rank}º` : '-'}]</span>
                     </td>
                     {visibleMatches.map(match => {
                       const pred = getPrediction(profile.user_id, match.id);
