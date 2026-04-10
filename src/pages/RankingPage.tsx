@@ -228,7 +228,7 @@ export default function RankingPage() {
           <div className="space-y-2">
             {/* Legend */}
             <div className="flex items-center justify-center gap-4 py-2 px-3 rounded-lg bg-secondary/50 text-[10px] text-muted-foreground">
-              <span><span className="font-bold text-green-600">+5</span> = EXATO</span>
+              <span>+5 = <span className="font-bold text-green-600">EXATO</span></span>
               <span><span className="font-bold text-yellow-600">+2</span> = QUASE</span>
               <span><span className="font-bold text-destructive">-1</span> = INVERSO</span>
               <span><span className="font-bold">0</span> = Esqueceu</span>
