@@ -226,6 +226,13 @@ export default function RankingPage() {
           </div>
         ) : (
           <div className="space-y-2">
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-4 py-2 px-3 rounded-lg bg-secondary/50 text-[10px] text-muted-foreground">
+              <span><span className="font-bold text-green-600">N</span> = Exatos (+5)</span>
+              <span><span className="font-bold text-yellow-600">N</span> = Inexatos (+2)</span>
+              <span><span className="font-bold text-destructive">N</span> = Invertidos (-1)</span>
+              <span><span className="font-bold">N</span> 😩 = Esqueceu</span>
+            </div>
             {ranking.map((entry, i) => {
               const isLastPosition = ranking.length > 1 && entry.position === ranking[ranking.length - 1].position;
               const medal = getMedalEmoji(entry.position, isLastPosition);
@@ -269,21 +276,25 @@ export default function RankingPage() {
                       </div>
                       <div className="flex flex-col items-center">
                         <span className="text-xs font-bold text-muted-foreground">{entry.missed_count}</span>
-                        <span className="text-[8px] text-muted-foreground leading-tight">🚫</span>
+                        <span className="text-[8px] text-muted-foreground leading-tight">😩</span>
                       </div>
                     </div>
                   </div>
                   <div className="text-right flex items-center gap-2">
-                    {entry.positionChange !== null && entry.positionChange !== 0 && (
-                      <span className={`flex items-center text-[10px] font-bold ${entry.positionChange > 0 ? 'text-green-600' : 'text-destructive'}`}>
-                        {entry.positionChange > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-                        {Math.abs(entry.positionChange)}
-                      </span>
-                    )}
                     <div>
                       <p className="font-bold tabular-nums">{entry.total_points}</p>
                       <p className="text-[10px] text-muted-foreground">pts</p>
                     </div>
+                    {entry.positionChange !== null && entry.positionChange !== 0 ? (
+                      <span className={`flex items-center text-[10px] font-bold min-w-[28px] justify-center ${entry.positionChange > 0 ? 'text-green-600 bg-green-50 rounded px-1 py-0.5' : 'text-destructive bg-red-50 rounded px-1 py-0.5'}`}>
+                        {entry.positionChange > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                        {Math.abs(entry.positionChange)}
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center text-[10px] font-bold text-muted-foreground bg-secondary rounded px-1 py-0.5 min-w-[28px]">
+                        <Minus className="h-3 w-3" />
+                      </span>
+                    )}
                   </div>
                 </div>
               );
