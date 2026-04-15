@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/AppLayout';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { FixedSizeList as List } from 'react-window';
+import { FixedSizeList } from 'react-window';
 
 type Profile = { user_id: string; name: string };
 type Match = { id: string; home_team: string; away_team: string; match_datetime: string; is_finished: boolean; is_started: boolean; home_score: number | null; away_score: number | null; group_name: string };
