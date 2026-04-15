@@ -218,6 +218,19 @@ export type Database = {
         Args: { p_match_id: string }
         Returns: undefined
       }
+      get_ranking: {
+        Args: { p_date?: string; p_group_id?: string }
+        Returns: {
+          out_exact_count: number
+          out_missed_count: number
+          out_name: string
+          out_negative_count: number
+          out_partial_count: number
+          out_position: number
+          out_total_points: number
+          out_user_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
