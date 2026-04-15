@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/select';
 import { format, addDays, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 type RankingEntry = {
   user_id: string;
@@ -22,7 +23,6 @@ type RankingEntry = {
 };
 
 type FriendshipGroup = { id: string; name: string };
-type UserFriendshipGroup = { user_id: string; group_id: string };
 
 export default function RankingPage() {
   const { user } = useAuth();
@@ -31,22 +31,18 @@ export default function RankingPage() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [friendshipGroups, setFriendshipGroups] = useState<FriendshipGroup[]>([]);
-  const [userFriendshipGroups, setUserFriendshipGroups] = useState<UserFriendshipGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
 
   useEffect(() => {
     const fetchGroups = async () => {
-      const [fgRes, ufgRes] = await Promise.all([
-        supabase.from('friendship_groups').select('id, name').order('name'),
-        supabase.from('user_friendship_groups').select('user_id, group_id'),
-      ]);
-      if (fgRes.data) setFriendshipGroups(fgRes.data);
-      if (ufgRes.data) setUserFriendshipGroups(ufgRes.data);
+      const { data, error } = await supabase.from('friendship_groups').select('id, name').order('name');
+      if (error) { toast.error(error.message); return; }
+      if (data) setFriendshipGroups(data);
     };
     fetchGroups();
   }, []);
 
-  useEffect(() => { fetchRanking(); }, [tab, selectedDate, selectedGroup, userFriendshipGroups]);
+  useEffect(() => { fetchRanking(); }, [tab, selectedDate, selectedGroup]);
 
   useEffect(() => {
     const channel = supabase
@@ -54,114 +50,113 @@ export default function RankingPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => fetchRanking())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [tab, selectedDate, selectedGroup, userFriendshipGroups]);
+  }, [tab, selectedDate, selectedGroup]);
 
   const fetchRanking = async () => {
     setLoading(true);
-    const { data: profiles } = await supabase.from('profiles').select('user_id, name').eq('is_approved', true);
-    if (!profiles) { setLoading(false); return; }
 
-    let filteredProfiles = profiles;
-    if (selectedGroup !== 'all') {
-      const groupUserIds = new Set(userFriendshipGroups.filter(ufg => ufg.group_id === selectedGroup).map(ufg => ufg.user_id));
-      filteredProfiles = profiles.filter(p => groupUserIds.has(p.user_id));
-    }
-
-    const { data: finishedMatches } = await supabase.from('matches').select('id, match_datetime').eq('is_finished', true).order('match_datetime', { ascending: false });
-
-    // Fetch predictions to calculate missed matches
-    const { data: predictionsData } = await supabase.from('predictions').select('user_id, match_id');
-
-    let scoresQuery = supabase.from('scores').select('user_id, match_id, points');
-    let relevantFinishedMatchIds: string[] = finishedMatches?.map(m => m.id) ?? [];
+    const groupId = selectedGroup !== 'all' ? selectedGroup : undefined;
 
     if (tab === 'dia') {
-      const dayStart = new Date(selectedDate);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(selectedDate);
-      dayEnd.setHours(23, 59, 59, 999);
-      const { data: dayMatches } = await supabase.from('matches').select('id')
-        .gte('match_datetime', dayStart.toISOString()).lte('match_datetime', dayEnd.toISOString());
-      if (!dayMatches || dayMatches.length === 0) { setRanking([]); setLoading(false); return; }
-      scoresQuery = scoresQuery.in('match_id', dayMatches.map(m => m.id));
-      // For daily view, only count finished matches of that day
-      const dayMatchIds = new Set(dayMatches.map(m => m.id));
-      relevantFinishedMatchIds = relevantFinishedMatchIds.filter(id => dayMatchIds.has(id));
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const { data, error } = await supabase.rpc('get_ranking', {
+        p_date: dateStr,
+        p_group_id: groupId ?? null,
+      });
+      if (error) { toast.error(error.message); setLoading(false); return; }
+      if (!data || data.length === 0) { setRanking([]); setLoading(false); return; }
+
+      const entries: RankingEntry[] = data.map((r: any) => ({
+        user_id: r.out_user_id,
+        name: r.out_name,
+        total_points: Number(r.out_total_points),
+        exact_count: Number(r.out_exact_count),
+        partial_count: Number(r.out_partial_count),
+        negative_count: Number(r.out_negative_count),
+        missed_count: Number(r.out_missed_count),
+        position: r.out_position,
+        positionChange: null,
+      }));
+      setRanking(entries);
+      setLoading(false);
+      return;
     }
 
-    const { data: scoresData } = await scoresQuery;
-    if (!scoresData) { setLoading(false); return; }
-
-    // Build a set of predictions per user
-    const userPredictions = new Map<string, Set<string>>();
-    predictionsData?.forEach(p => {
-      if (!userPredictions.has(p.user_id)) userPredictions.set(p.user_id, new Set());
-      userPredictions.get(p.user_id)!.add(p.match_id);
+    // Tab geral: current ranking + previous ranking for position change
+    const { data: currentData, error: currentError } = await supabase.rpc('get_ranking', {
+      p_date: null,
+      p_group_id: groupId ?? null,
     });
+    if (currentError) { toast.error(currentError.message); setLoading(false); return; }
+    if (!currentData || currentData.length === 0) { setRanking([]); setLoading(false); return; }
 
-    const finishedMatchIdSet = new Set(relevantFinishedMatchIds);
+    const entries: RankingEntry[] = currentData.map((r: any) => ({
+      user_id: r.out_user_id,
+      name: r.out_name,
+      total_points: Number(r.out_total_points),
+      exact_count: Number(r.out_exact_count),
+      partial_count: Number(r.out_partial_count),
+      negative_count: Number(r.out_negative_count),
+      missed_count: Number(r.out_missed_count),
+      position: r.out_position,
+      positionChange: null,
+    }));
 
-    const buildRanking = (scores: typeof scoresData, profs: typeof filteredProfiles) => {
-      const userMap = new Map<string, RankingEntry>();
-      profs.forEach(p => {
-        // Count missed: finished matches where user has no prediction
-        const userPreds = userPredictions.get(p.user_id) ?? new Set();
-        const missed = relevantFinishedMatchIds.filter(mId => !userPreds.has(mId)).length;
-        userMap.set(p.user_id, {
-          user_id: p.user_id, name: p.name,
-          total_points: 0, exact_count: 0, partial_count: 0, negative_count: 0, missed_count: missed,
-          position: 0, positionChange: null,
+    // Calculate position change: get last finished match, exclude it, rebuild ranking
+    const { data: finishedMatches, error: fmError } = await supabase
+      .from('matches').select('id').eq('is_finished', true);
+    if (!fmError && finishedMatches && finishedMatches.length >= 2) {
+      // We need to compute previous ranking by excluding latest match scores
+      // For simplicity, use the current scores minus the last finished match
+      const { data: allScores, error: asError } = await supabase
+        .from('scores').select('user_id, match_id, points');
+      const { data: fmOrdered } = await supabase
+        .from('matches').select('id').eq('is_finished', true).order('match_datetime', { ascending: false }).limit(1);
+      
+      if (!asError && allScores && fmOrdered && fmOrdered.length > 0) {
+        const latestMatchId = fmOrdered[0].id;
+        // Build previous ranking manually
+        const prevScores = allScores.filter(s => s.match_id !== latestMatchId);
+        const prevMap = new Map<string, { total: number; exact: number; partial: number; negative: number }>();
+        entries.forEach(e => prevMap.set(e.user_id, { total: 0, exact: 0, partial: 0, negative: 0 }));
+        prevScores.forEach(s => {
+          const entry = prevMap.get(s.user_id);
+          if (!entry) return;
+          entry.total += s.points;
+          if (s.points === 5) entry.exact++;
+          else if (s.points === 2) entry.partial++;
+          else if (s.points === -1) entry.negative++;
         });
-      });
-      scores.forEach(s => {
-        const entry = userMap.get(s.user_id);
-        if (!entry) return;
-        entry.total_points += s.points;
-        if (s.points === 5) entry.exact_count++;
-        else if (s.points === 2) entry.partial_count++;
-        else if (s.points === -1) entry.negative_count++;
-      });
-      const sorted = Array.from(userMap.values()).sort((a, b) => {
-        if (b.total_points !== a.total_points) return b.total_points - a.total_points;
-        if (b.exact_count !== a.exact_count) return b.exact_count - a.exact_count;
-        if (b.partial_count !== a.partial_count) return b.partial_count - a.partial_count;
-        if (a.negative_count !== b.negative_count) return a.negative_count - b.negative_count;
-        return a.name.localeCompare(b.name);
-      });
-      for (let i = 0; i < sorted.length; i++) {
-        if (i > 0) {
-          const prev = sorted[i - 1];
-          const curr = sorted[i];
-          if (curr.total_points === prev.total_points && curr.exact_count === prev.exact_count &&
-              curr.partial_count === prev.partial_count && curr.negative_count === prev.negative_count) {
-            curr.position = prev.position;
-          } else {
-            curr.position = i + 1;
+        const sorted = Array.from(prevMap.entries())
+          .map(([uid, e]) => ({ uid, ...e }))
+          .sort((a, b) => {
+            if (b.total !== a.total) return b.total - a.total;
+            if (b.exact !== a.exact) return b.exact - a.exact;
+            if (b.partial !== a.partial) return b.partial - a.partial;
+            return a.negative - b.negative;
+          });
+        const prevPositions = new Map<string, number>();
+        let pos = 1;
+        for (let i = 0; i < sorted.length; i++) {
+          if (i > 0) {
+            const prev = sorted[i - 1];
+            const curr = sorted[i];
+            if (curr.total !== prev.total || curr.exact !== prev.exact || curr.partial !== prev.partial || curr.negative !== prev.negative) {
+              pos = i + 1;
+            }
           }
-        } else {
-          sorted[i].position = 1;
+          prevPositions.set(sorted[i].uid, pos);
         }
+        entries.forEach(e => {
+          const prevPos = prevPositions.get(e.user_id);
+          if (prevPos !== undefined) {
+            e.positionChange = prevPos - e.position;
+          }
+        });
       }
-      return sorted;
-    };
-
-    const currentRanking = buildRanking(scoresData, filteredProfiles);
-
-    if (tab === 'geral' && finishedMatches && finishedMatches.length >= 2) {
-      const latestMatchId = finishedMatches[0].id;
-      const prevScores = scoresData.filter(s => s.match_id !== latestMatchId);
-      const prevRanking = buildRanking(prevScores, filteredProfiles);
-      const prevPosMap = new Map<string, number>();
-      prevRanking.forEach(e => prevPosMap.set(e.user_id, e.position));
-      currentRanking.forEach(e => {
-        const prevPos = prevPosMap.get(e.user_id);
-        if (prevPos !== undefined) {
-          e.positionChange = prevPos - e.position;
-        }
-      });
     }
 
-    setRanking(currentRanking);
+    setRanking(entries);
     setLoading(false);
   };
 

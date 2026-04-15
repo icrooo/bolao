@@ -53,6 +53,9 @@ export default function AdminPage() {
   const [editingUserName, setEditingUserName] = useState<string | null>(null);
   const [editNameValue, setEditNameValue] = useState('');
 
+  // Delete user confirmation
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<Profile | null>(null);
+
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
@@ -62,6 +65,10 @@ export default function AdminPage() {
       supabase.from('friendship_groups').select('*').order('name'),
       supabase.from('user_friendship_groups').select('*'),
     ]);
+    if (profRes.error) { toast.error(profRes.error.message); }
+    if (matchRes.error) { toast.error(matchRes.error.message); }
+    if (fgRes.error) { toast.error(fgRes.error.message); }
+    if (ufgRes.error) { toast.error(ufgRes.error.message); }
     if (profRes.data) setProfiles(profRes.data as Profile[]);
     if (matchRes.data) setMatches(matchRes.data as Match[]);
     if (fgRes.data) setFriendshipGroups(fgRes.data as FriendshipGroup[]);
@@ -77,7 +84,6 @@ export default function AdminPage() {
   };
 
   const deleteUser = async (profile: Profile) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o usuário "${profile.name}"? Todos os seus palpites e pontuações serão removidos.`)) return;
     await supabase.from('scores').delete().eq('user_id', profile.user_id);
     await supabase.from('predictions').delete().eq('user_id', profile.user_id);
     await supabase.from('user_roles').delete().eq('user_id', profile.user_id);
@@ -86,6 +92,7 @@ export default function AdminPage() {
     if (error) { toast.error(error.message); return; }
     toast.success('Usuário excluído!');
     setProfiles(prev => prev.filter(p => p.user_id !== profile.user_id));
+    setConfirmDeleteUser(null);
   };
 
   const saveUserName = async (userId: string) => {
@@ -97,7 +104,6 @@ export default function AdminPage() {
     setEditingUserName(null);
   };
 
-  // Friendship group management
   const addFriendshipGroup = async () => {
     if (!newGroupName.trim()) { toast.error('Nome do grupo é obrigatório'); return; }
     const { error } = await supabase.from('friendship_groups').insert({ name: newGroupName.trim() });
@@ -253,7 +259,6 @@ export default function AdminPage() {
 
         {tab === 'users' && (
           <div className="space-y-4">
-            {/* Friendship Groups Management */}
             <div className="glass-card p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Grupos de Amizade</p>
@@ -280,7 +285,6 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Users list */}
             {profiles.map((p, i) => {
               const userGroups = userFriendshipGroups.filter(ufg => ufg.user_id === p.user_id);
               return (
@@ -311,12 +315,11 @@ export default function AdminPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Switch checked={p.is_approved} onCheckedChange={(checked) => approveUser(p.user_id, checked)} />
-                      <button onClick={() => deleteUser(p)} className="text-destructive hover:text-destructive/80 active:scale-90 transition-all">
+                      <button onClick={() => setConfirmDeleteUser(p)} className="text-destructive hover:text-destructive/80 active:scale-90 transition-all">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </div>
-                  {/* Friendship group selectors */}
                   {friendshipGroups.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {friendshipGroups.map(g => {
@@ -500,6 +503,7 @@ export default function AdminPage() {
         )}
       </div>
 
+      {/* Confirm finish match */}
       <AlertDialog open={!!confirmFinish} onOpenChange={(open) => { if (!open) setConfirmFinish(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -511,6 +515,27 @@ export default function AdminPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={() => confirmFinish && finishMatch(confirmFinish)}>Encerrar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm delete user */}
+      <AlertDialog open={!!confirmDeleteUser} onOpenChange={(open) => { if (!open) setConfirmDeleteUser(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir usuário</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o usuário "{confirmDeleteUser?.name}"? Todos os seus palpites e pontuações serão removidos permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmDeleteUser && deleteUser(confirmDeleteUser)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
