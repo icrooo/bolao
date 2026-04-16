@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useServerTime } from '@/hooks/useServerTime';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
-import { Loader2, Check, Lock, Minus, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Check, Lock, Minus, Plus, ChevronDown, ChevronUp, Clock, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -16,12 +16,13 @@ type Match = {
   is_finished: boolean; is_started: boolean;
 };
 type Prediction = { id: string; match_id: string; home_score_pred: number; away_score_pred: number };
-type Score = { match_id: string; points: number };
+type Score = { match_id: string; points: number; is_provisional?: boolean };
 type AllPrediction = { user_id: string; match_id: string; home_score_pred: number; away_score_pred: number };
 type Profile = { user_id: string; name: string };
 
 const LOCK_MINUTES = 10;
-const FILTERS = ['PRÓXIMOS JOGOS', 'TODOS', 'GRUPOS'] as const;
+const KNOCKOUT_PHASES = ['16-AVOS', 'OITAVAS', 'QUARTAS', 'SEMI', '3º e 4º', 'FINAL'];
+const FILTERS = ['PRÓXIMOS JOGOS', 'TODOS', 'GRUPOS', 'MATA-MATA'] as const;
 
 function CountryFlag({ name, side }: { name: string; side: 'home' | 'away' }) {
   const url = getFlagUrl(name, 24);
@@ -31,9 +32,14 @@ function CountryFlag({ name, side }: { name: string; side: 'home' | 'away' }) {
   );
 }
 
-function ScoreBadge({ points }: { points: number }) {
+function ScoreBadge({ points, isProvisional }: { points: number; isProvisional?: boolean }) {
   const cls = points === 5 ? 'score-badge-5' : points === 2 ? 'score-badge-2' : points === -1 ? 'score-badge-negative' : 'score-badge-0';
-  return <span className={`${cls} text-xs font-bold px-2 py-0.5 rounded-full`}>{points > 0 ? '+' : ''}{points} pts</span>;
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className={`${cls} text-xs font-bold px-2 py-0.5 rounded-full`}>{points > 0 ? '+' : ''}{points} pts</span>
+      {isProvisional && <Clock className="h-3 w-3 text-muted-foreground" />}
+    </span>
+  );
 }
 
 function MatchStatusBadge({ match, serverNow }: { match: Match; serverNow: () => number }) {
@@ -62,7 +68,25 @@ function CountdownTimer({ datetime, serverNow, onExpired }: { datetime: string; 
   const h = Math.floor((secondsLeft % 86400) / 3600);
   const m = Math.floor((secondsLeft % 3600) / 60);
   const s = secondsLeft % 60;
-  return <span className="text-xs text-muted-foreground tabular-nums">Bloqueia em {d > 0 ? `${d}d ` : ''}{h.toString().padStart(2, '0')}h {m.toString().padStart(2, '0')}min {s.toString().padStart(2, '0')}s</span>;
+  const timeStr = `Bloqueia em ${d > 0 ? `${d}d ` : ''}${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}min ${s.toString().padStart(2, '0')}s`;
+
+  if (secondsLeft <= 3600) {
+    return (
+      <span className="absolute top-2.5 right-3 flex items-center gap-1 text-[11px] font-bold text-destructive tabular-nums animate-pulse">
+        <Clock className="h-3 w-3" />{timeStr}
+      </span>
+    );
+  }
+  if (secondsLeft <= 86400) {
+    return (
+      <span className="absolute top-2.5 right-3 flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+        <AlertCircle className="h-3 w-3" />{timeStr}
+      </span>
+    );
+  }
+  return (
+    <span className="absolute top-2.5 right-3 text-[11px] text-muted-foreground tabular-nums">{timeStr}</span>
+  );
 }
 
 function ScoreInput({ value, onChange, disabled }: { value: number; onChange: (v: number) => void; disabled: boolean }) {
@@ -151,7 +175,6 @@ export default function PredictionsPage() {
   const [scores, setScores] = useState<Map<string, Score>>(new Map());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
-  const [savedMatches, setSavedMatches] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<string>('PRÓXIMOS JOGOS');
   const [drafts, setDrafts] = useState<Map<string, { home: number; away: number }>>(new Map());
   const [, forceUpdate] = useState(0);
@@ -252,9 +275,13 @@ export default function PredictionsPage() {
       return upcoming;
     }
     if (filter === 'GRUPOS') {
-      const knockoutOrder = ['16-AVOS', 'OITAVAS', 'QUARTAS', 'SEMI', '3º e 4º', 'FINAL'];
-      const getGroupOrder = (name: string) => { const ki = knockoutOrder.indexOf(name); if (ki !== -1) return `ZZ_${ki.toString().padStart(2, '0')}`; return name; };
+      const getGroupOrder = (name: string) => { const ki = KNOCKOUT_PHASES.indexOf(name); if (ki !== -1) return `ZZ_${ki.toString().padStart(2, '0')}`; return name; };
       return [...matches].sort((a, b) => getGroupOrder(a.group_name).localeCompare(getGroupOrder(b.group_name)) || new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime());
+    }
+    if (filter === 'MATA-MATA') {
+      return matches
+        .filter(m => KNOCKOUT_PHASES.includes(m.group_name))
+        .sort((a, b) => KNOCKOUT_PHASES.indexOf(a.group_name) - KNOCKOUT_PHASES.indexOf(b.group_name) || new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime());
     }
     return matches;
   }, [matches, filter, serverNow]);
@@ -275,7 +302,6 @@ export default function PredictionsPage() {
         const { error } = await supabase.from('predictions').insert({ user_id: user.id, match_id: match.id, home_score_pred: draft.home, away_score_pred: draft.away });
         if (error) throw error;
       }
-      setSavedMatches(prev => new Set(prev).add(match.id));
       await fetchData();
       setDrafts(prev => { const n = new Map(prev); n.delete(match.id); return n; });
     } catch (e: any) {
@@ -286,7 +312,14 @@ export default function PredictionsPage() {
   };
 
   const hasDraftChanged = (matchId: string) => { const draft = drafts.get(matchId); if (!draft) return false; const pred = predictions.get(matchId); if (!pred) return true; return draft.home !== pred.home_score_pred || draft.away !== pred.away_score_pred; };
-  const getPartialPoints = (match: Match, pred: Prediction | undefined) => { if (!pred) return null; if (match.home_score === null || match.away_score === null) return null; return calcPoints(pred, match.home_score, match.away_score); };
+
+  const getButtonState = (matchId: string) => {
+    const pred = predictions.get(matchId);
+    const draft = drafts.get(matchId);
+    if (!pred) return { label: 'Salvar palpite', disabled: false, saved: false };
+    if (!draft || (draft.home === pred.home_score_pred && draft.away === pred.away_score_pred)) return { label: 'Salvo ✓', disabled: true, saved: true };
+    return { label: 'Alterar e salvar', disabled: false, saved: false };
+  };
 
   if (loading) {
     return <AppLayout><div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></AppLayout>;
@@ -313,12 +346,12 @@ export default function PredictionsPage() {
               const pred = predictions.get(match.id);
               const score = scores.get(match.id);
               const draft = getDraft(match.id);
-              const changed = hasDraftChanged(match.id);
-              const partialPts = getPartialPoints(match, pred);
-              const displayPoints = score?.points ?? partialPts;
+              const isProvisional = score?.is_provisional === true;
+              const displayPoints = score?.points ?? null;
+              const btnState = getButtonState(match.id);
 
               return (
-                <div key={match.id} className="glass-card p-4 animate-reveal-up" style={{ animationDelay: `${Math.min(i * 60, 300)}ms` }}>
+                <div key={match.id} className="glass-card p-4 animate-reveal-up relative" style={{ animationDelay: `${Math.min(i * 60, 300)}ms` }}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                       {match.group_name.length === 1 ? `Grupo ${match.group_name}` : match.group_name} · {format(new Date(match.match_datetime), "dd MMM · HH:mm", { locale: ptBR })}
@@ -326,13 +359,18 @@ export default function PredictionsPage() {
                     <MatchStatusBadge match={match} serverNow={serverNow} />
                   </div>
 
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex-1 flex items-center justify-end gap-1">
-                      <p className="text-sm font-medium truncate">{match.home_team}</p>
+                  {/* Countdown positioned absolute top-right */}
+                  {!locked && (
+                    <CountdownTimer datetime={match.match_datetime} serverNow={serverNow} onExpired={handleTimerExpired} />
+                  )}
+
+                  <div className="grid gap-2" style={{ gridTemplateColumns: '1fr auto 1fr' }}>
+                    <div className="flex items-center justify-end gap-1 min-w-0">
+                      <p className="text-sm font-medium text-right" style={{ wordBreak: 'break-word' }}>{match.home_team}</p>
                       <CountryFlag name={match.home_team} side="home" />
                     </div>
                     {locked ? (
-                      <div className="flex items-center gap-2 mx-2">
+                      <div className="flex items-center gap-2">
                         {pred ? (
                           <span className="font-bold tabular-nums text-sm">{pred.home_score_pred} × {pred.away_score_pred}</span>
                         ) : (
@@ -340,15 +378,15 @@ export default function PredictionsPage() {
                         )}
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1 mx-2">
+                      <div className="flex items-center gap-1">
                         <ScoreInput value={draft.home} onChange={v => setDraft(match.id, v, draft.away)} disabled={false} />
                         <span className="text-muted-foreground text-xs mx-0.5">×</span>
                         <ScoreInput value={draft.away} onChange={v => setDraft(match.id, draft.home, v)} disabled={false} />
                       </div>
                     )}
-                    <div className="flex-1 flex items-center gap-1">
+                    <div className="flex items-center gap-1 min-w-0">
                       <CountryFlag name={match.away_team} side="away" />
-                      <p className="text-sm font-medium truncate">{match.away_team}</p>
+                      <p className="text-sm font-medium text-left" style={{ wordBreak: 'break-word' }}>{match.away_team}</p>
                     </div>
                   </div>
 
@@ -359,16 +397,19 @@ export default function PredictionsPage() {
                     </div>
                   )}
 
-                  {displayPoints !== null && <div className="text-center mt-2"><ScoreBadge points={displayPoints} /></div>}
+                  {displayPoints !== null && (
+                    <div className="text-center mt-2">
+                      <ScoreBadge points={displayPoints} isProvisional={isProvisional} />
+                    </div>
+                  )}
 
                   {!locked && (
-                    <div className="mt-3 space-y-2">
-                      <Button size="sm" onClick={() => savePrediction(match)} disabled={saving === match.id || !changed}
-                        className="w-full text-xs active:scale-[0.97]">
+                    <div className="mt-3">
+                      <Button size="sm" onClick={() => savePrediction(match)} disabled={saving === match.id || btnState.disabled}
+                        className={`w-full text-xs active:scale-[0.97] ${btnState.saved ? 'opacity-60' : ''}`}>
                         {saving === match.id ? <Loader2 className="h-3 w-3 animate-spin" /> :
-                          savedMatches.has(match.id) && !changed ? <><Check className="h-3 w-3 mr-1" /> Salvo</> : 'Salvar palpite'}
+                          btnState.saved ? <><Check className="h-3 w-3 mr-1" /> {btnState.label}</> : btnState.label}
                       </Button>
-                      <CountdownTimer datetime={match.match_datetime} serverNow={serverNow} onExpired={handleTimerExpired} />
                     </div>
                   )}
 

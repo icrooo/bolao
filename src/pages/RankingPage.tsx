@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/AppLayout';
-import { Loader2, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Minus, Trophy } from 'lucide-react';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -24,6 +24,13 @@ type RankingEntry = {
 
 type FriendshipGroup = { id: string; name: string };
 
+const PODIUM_COLORS = [
+  { light: 'hsl(45 80% 92%)', dark: 'hsl(45 40% 22%)' },
+  { light: 'hsl(220 20% 91%)', dark: 'hsl(220 15% 24%)' },
+  { light: 'hsl(25 55% 90%)', dark: 'hsl(25 30% 22%)' },
+];
+const TROPHY_COLORS = ['#b8860b', '#708090', '#8b4513'];
+
 export default function RankingPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<'geral' | 'dia'>('geral');
@@ -32,6 +39,8 @@ export default function RankingPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [friendshipGroups, setFriendshipGroups] = useState<FriendshipGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const isDark = document.documentElement.classList.contains('dark');
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -64,7 +73,7 @@ export default function RankingPage() {
         p_group_id: groupId ?? null,
       });
       if (error) { toast.error(error.message); setLoading(false); return; }
-      if (!data || data.length === 0) { setRanking([]); setLoading(false); return; }
+      if (!data || data.length === 0) { setRanking([]); setLoading(false); setLastUpdated(new Date()); return; }
 
       const entries: RankingEntry[] = data.map((r: any) => ({
         user_id: r.out_user_id,
@@ -79,16 +88,17 @@ export default function RankingPage() {
       }));
       setRanking(entries);
       setLoading(false);
+      setLastUpdated(new Date());
       return;
     }
 
-    // Tab geral: current ranking + previous ranking for position change
+    // Tab geral
     const { data: currentData, error: currentError } = await supabase.rpc('get_ranking', {
       p_date: null,
       p_group_id: groupId ?? null,
     });
     if (currentError) { toast.error(currentError.message); setLoading(false); return; }
-    if (!currentData || currentData.length === 0) { setRanking([]); setLoading(false); return; }
+    if (!currentData || currentData.length === 0) { setRanking([]); setLoading(false); setLastUpdated(new Date()); return; }
 
     const entries: RankingEntry[] = currentData.map((r: any) => ({
       user_id: r.out_user_id,
@@ -102,20 +112,17 @@ export default function RankingPage() {
       positionChange: null,
     }));
 
-    // Calculate position change: get last finished match, exclude it, rebuild ranking
+    // Calculate position change
     const { data: finishedMatches, error: fmError } = await supabase
       .from('matches').select('id').eq('is_finished', true);
     if (!fmError && finishedMatches && finishedMatches.length >= 2) {
-      // We need to compute previous ranking by excluding latest match scores
-      // For simplicity, use the current scores minus the last finished match
       const { data: allScores, error: asError } = await supabase
         .from('scores').select('user_id, match_id, points');
       const { data: fmOrdered } = await supabase
         .from('matches').select('id').eq('is_finished', true).order('match_datetime', { ascending: false }).limit(1);
-      
+
       if (!asError && allScores && fmOrdered && fmOrdered.length > 0) {
         const latestMatchId = fmOrdered[0].id;
-        // Build previous ranking manually
         const prevScores = allScores.filter(s => s.match_id !== latestMatchId);
         const prevMap = new Map<string, { total: number; exact: number; partial: number; negative: number }>();
         entries.forEach(e => prevMap.set(e.user_id, { total: 0, exact: 0, partial: 0, negative: 0 }));
@@ -158,6 +165,7 @@ export default function RankingPage() {
 
     setRanking(entries);
     setLoading(false);
+    setLastUpdated(new Date());
   };
 
   const getMedalEmoji = (pos: number, isLast: boolean) => {
@@ -167,6 +175,8 @@ export default function RankingPage() {
     if (isLast) return '💩';
     return null;
   };
+
+  const showPodiumColors = selectedGroup === 'all' && tab === 'geral';
 
   return (
     <AppLayout>
@@ -211,6 +221,14 @@ export default function RankingPage() {
           </div>
         )}
 
+        {lastUpdated && (
+          <div className="text-right">
+            <span className="text-[12px] text-muted-foreground">
+              Atualizado às {format(lastUpdated, 'HH:mm:ss', { locale: ptBR })}
+            </span>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -232,13 +250,20 @@ export default function RankingPage() {
               const isLastPosition = ranking.length > 1 && entry.position === ranking[ranking.length - 1].position;
               const medal = getMedalEmoji(entry.position, isLastPosition);
               const isMe = entry.user_id === user?.id;
+              const podiumIndex = showPodiumColors && entry.position <= 3 ? entry.position - 1 : -1;
+              const podiumBg = podiumIndex >= 0 ? (isDark ? PODIUM_COLORS[podiumIndex].dark : PODIUM_COLORS[podiumIndex].light) : undefined;
+              const trophyColor = podiumIndex >= 0 ? TROPHY_COLORS[podiumIndex] : undefined;
+
               return (
                 <div
                   key={entry.user_id}
                   className={`glass-card p-3 flex items-center gap-3 animate-reveal-up ${
-                    isMe ? 'ring-2 ring-primary bg-primary/5' : ''
+                    isMe ? 'ring-2 ring-primary' : ''
                   }`}
-                  style={{ animationDelay: `${Math.min(i * 50, 300)}ms` }}
+                  style={{
+                    animationDelay: `${Math.min(i * 50, 300)}ms`,
+                    ...(podiumBg ? { backgroundColor: podiumBg } : {}),
+                  }}
                 >
                   <div className={`${medal ? 'w-10 h-10' : 'w-9 h-9'} rounded-full bg-secondary flex items-center justify-center shrink-0`}>
                     {medal ? (
@@ -249,9 +274,10 @@ export default function RankingPage() {
                   </div>
                   <div className="flex-1 min-w-0 flex items-center gap-2">
                     <div className="flex items-center gap-1.5 shrink min-w-0">
+                      {trophyColor && <Trophy className="h-3.5 w-3.5 shrink-0" style={{ color: trophyColor }} />}
                       <p className="font-medium text-sm truncate">{entry.name}</p>
                       {isMe && (
-                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 shrink-0">
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 shrink-0">
                           Você
                         </span>
                       )}
@@ -281,7 +307,7 @@ export default function RankingPage() {
                       <p className="text-[10px] text-muted-foreground">pts</p>
                     </div>
                     {entry.positionChange !== null && entry.positionChange !== 0 ? (
-                      <span className={`flex items-center text-[10px] font-bold min-w-[28px] justify-center ${entry.positionChange > 0 ? 'text-green-600 bg-green-50 rounded px-1 py-0.5' : 'text-destructive bg-red-50 rounded px-1 py-0.5'}`}>
+                      <span className={`flex items-center text-[10px] font-bold min-w-[28px] justify-center ${entry.positionChange > 0 ? 'text-green-600 bg-green-50 dark:bg-green-900/30 rounded px-1 py-0.5' : 'text-destructive bg-red-50 dark:bg-red-900/30 rounded px-1 py-0.5'}`}>
                         {entry.positionChange > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
                         {Math.abs(entry.positionChange)}
                       </span>
