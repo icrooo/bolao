@@ -141,11 +141,11 @@ export default function AllPredictionsPage() {
         <div className="flex gap-2">
           <button onClick={() => setPhaseFilter('grupos')} disabled={!hasGroupMatches}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-[0.98] disabled:opacity-40 ${phaseFilter === 'grupos' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}>
-            Fase de Grupos
+            FASE DE GRUPO
           </button>
           <button onClick={() => setPhaseFilter('mata-mata')} disabled={!hasKnockoutMatches}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-[0.98] disabled:opacity-40 ${phaseFilter === 'mata-mata' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}>
-            Mata-Mata
+            MATA-MATA
           </button>
         </div>
 
