@@ -38,6 +38,7 @@ export default function AdminPage() {
   const [newMatch, setNewMatch] = useState({ home_team: '', away_team: '', match_datetime: '', group_name: '' });
   const [finishingMatch, setFinishingMatch] = useState<string | null>(null);
   const [confirmFinish, setConfirmFinish] = useState<string | null>(null);
+  const [confirmRestart, setConfirmRestart] = useState<string | null>(null);
   const [startingMatch, setStartingMatch] = useState<string | null>(null);
   const [editingMatch, setEditingMatch] = useState<string | null>(null);
   const [editData, setEditData] = useState({ home_team: '', away_team: '', match_datetime: '', group_name: '' });
@@ -183,7 +184,12 @@ export default function AdminPage() {
     if (match[otherField] === null) updatePayload[otherField] = 0;
     const { error } = await supabase.from('matches').update(updatePayload).eq('id', matchId);
     if (error) { toast.error(error.message); setUpdatingScore(null); return; }
-    await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
+    // Calculate live provisional scores for in-progress matches
+    if (match.is_started && !match.is_finished) {
+      await supabase.rpc('calculate_live_scores', { p_match_id: matchId });
+    } else {
+      await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
+    }
     setUpdatingScore(null);
     fetchData();
   };
@@ -192,18 +198,18 @@ export default function AdminPage() {
     setStartingMatch(matchId);
     const { error } = await supabase.from('matches').update({ is_started: true, home_score: 0, away_score: 0 }).eq('id', matchId);
     if (error) { toast.error(error.message); setStartingMatch(null); return; }
-    await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
+    await supabase.rpc('calculate_live_scores', { p_match_id: matchId });
     toast.success('Jogo iniciado!');
     setStartingMatch(null);
     fetchData();
   };
 
   const restartMatch = async (matchId: string) => {
-    if (!window.confirm('Reiniciar este jogo? O placar será zerado e o jogo voltará ao estado "não iniciado". As pontuações serão removidas.')) return;
     await supabase.from('scores').delete().eq('match_id', matchId);
     const { error } = await supabase.from('matches').update({ is_started: false, is_finished: false, home_score: null, away_score: null }).eq('id', matchId);
     if (error) { toast.error(error.message); return; }
     toast.success('Jogo reiniciado!');
+    setConfirmRestart(null);
     fetchData();
   };
 
@@ -423,7 +429,7 @@ export default function AdminPage() {
                       {(() => { const url = getFlagUrl(m.away_team, 24); return url ? <img src={url} alt={m.away_team} className="w-5 h-4 object-cover rounded-sm" /> : null; })()}
                       <span className="font-medium text-sm">{m.away_team}</span>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => restartMatch(m.id)}
+                    <Button size="sm" variant="outline" onClick={() => setConfirmRestart(m.id)}
                       className="w-full text-xs active:scale-95">
                       <RotateCcw className="h-3 w-3 mr-1" /> Reiniciar
                     </Button>
@@ -484,7 +490,7 @@ export default function AdminPage() {
                         </Button>
                       ) : (
                         <>
-                          <Button size="sm" variant="outline" onClick={() => restartMatch(m.id)}
+                          <Button size="sm" variant="outline" onClick={() => setConfirmRestart(m.id)}
                             className="flex-1 text-xs active:scale-95">
                             <RotateCcw className="h-3 w-3 mr-1" /> Reiniciar
                           </Button>
@@ -515,6 +521,27 @@ export default function AdminPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={() => confirmFinish && finishMatch(confirmFinish)}>Encerrar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm restart match */}
+      <AlertDialog open={!!confirmRestart} onOpenChange={(open) => { if (!open) setConfirmRestart(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reiniciar partida?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O placar e a pontuação provisória desta partida serão zerados. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmRestart && restartMatch(confirmRestart)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Reiniciar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

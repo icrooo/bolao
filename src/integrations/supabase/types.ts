@@ -136,18 +136,21 @@ export type Database = {
       scores: {
         Row: {
           id: string
+          is_provisional: boolean
           match_id: string
           points: number
           user_id: string
         }
         Insert: {
           id?: string
+          is_provisional?: boolean
           match_id: string
           points?: number
           user_id: string
         }
         Update: {
           id?: string
+          is_provisional?: boolean
           match_id?: string
           points?: number
           user_id?: string
@@ -214,6 +217,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_live_scores: {
+        Args: { p_match_id: string }
+        Returns: undefined
+      }
       calculate_match_scores: {
         Args: { p_match_id: string }
         Returns: undefined
