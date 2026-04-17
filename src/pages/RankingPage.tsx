@@ -249,9 +249,12 @@ export default function RankingPage() {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : ranking.length === 0 ? (
-          <div className="glass-card p-8 text-center">
-            <p className="text-muted-foreground text-sm">Nenhum resultado ainda</p>
-          </div>
+          <>
+            <div className="glass-card p-8 text-center">
+              <p className="text-muted-foreground text-sm">oxi oxi oxi. aguarde, ansioso.</p>
+            </div>
+            {anyMatchStarted === false && <NeymarGame />}
+          </>
         ) : (
           <div className="space-y-2">
             {/* Legend */}
