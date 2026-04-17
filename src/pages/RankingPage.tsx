@@ -41,7 +41,21 @@ export default function RankingPage() {
   const [friendshipGroups, setFriendshipGroups] = useState<FriendshipGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [anyMatchStarted, setAnyMatchStarted] = useState<boolean | null>(null);
   const isDark = document.documentElement.classList.contains('dark');
+
+  useEffect(() => {
+    const checkStarted = async () => {
+      const { data, error } = await supabase
+        .from('matches')
+        .select('id')
+        .eq('is_started', true)
+        .limit(1);
+      if (error) { toast.error(error.message); return; }
+      setAnyMatchStarted((data?.length ?? 0) > 0);
+    };
+    checkStarted();
+  }, [ranking]);
 
   useEffect(() => {
     const fetchGroups = async () => {
