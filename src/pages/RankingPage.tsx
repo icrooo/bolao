@@ -9,6 +9,7 @@ import {
 import { format, addDays, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { NeymarGame } from '@/components/NeymarGame';
 
 type RankingEntry = {
   user_id: string;
