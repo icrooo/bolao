@@ -139,17 +139,16 @@ export function NeymarGame() {
     s.vY += GRAVITY;
     s.playerY += s.vY;
     if (s.playerY > GROUND_Y) { s.playerY = GROUND_Y; s.vY = 0; }
-    // Chrome-dino-like progressive acceleration (no cap, keeps getting harder)
-    s.speed = BASE_SPEED + s.frame * 0.004;
-    const minGap = Math.max(26, 90 - s.speed * 3.2);
-    if (s.frame - s.lastSpawn > minGap) {
-      if (Math.random() < 0.88) {
-        s.obstacles.push({ x: canvas.width, emoji: OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)] });
-        if (s.speed > 11 && Math.random() < 0.3) {
-          s.obstacles.push({ x: canvas.width + 38 + Math.random() * 22, emoji: OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)] });
-        }
-        s.lastSpawn = s.frame;
+    // Chrome-dino-like progressive acceleration (2x faster ramp)
+    s.speed = BASE_SPEED + s.frame * 0.008;
+    const baseGap = Math.max(28, 90 - s.speed * 3.2);
+    const randomGap = baseGap + Math.random() * baseGap * 1.6;
+    if (s.frame - s.lastSpawn > randomGap) {
+      s.obstacles.push({ x: canvas.width, emoji: OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)] });
+      if (s.speed > 11 && Math.random() < 0.25) {
+        s.obstacles.push({ x: canvas.width + 38 + Math.random() * 30, emoji: OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)] });
       }
+      s.lastSpawn = s.frame;
     }
     s.obstacles.forEach(o => { o.x -= s.speed; });
     s.obstacles = s.obstacles.filter(o => o.x > -50);
