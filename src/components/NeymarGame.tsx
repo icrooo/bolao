@@ -127,9 +127,6 @@ export function NeymarGame() {
     ctx.font = 'bold 16px sans-serif';
     ctx.fillText(`Score: ${s.score}`, 12, 24);
     ctx.fillText(`HI: ${highScore}`, 12, 46);
-    ctx.font = 'bold 11px sans-serif';
-    ctx.fillStyle = '#555';
-    ctx.fillText(`Velocidade: ${s.speed.toFixed(1)}`, 12, 64);
   }, [highScore]);
 
   const loop = useCallback(() => {
