@@ -6,15 +6,18 @@ import { Trophy, RotateCcw } from 'lucide-react';
 
 type RankRow = { user_id: string; high_score: number; updated_at: string; name: string };
 
-const OBSTACLES = ['🍺', '🕶️', '⚽', '🔊', '🩴', '🎉'];
-const GROUND_Y = 140;
-const PLAYER_X = 60;
-const PLAYER_W = 36;
-const PLAYER_H = 44;
-const OBS_W = 28;
-const OBS_H = 28;
-const GRAVITY = 0.7;
-const JUMP_V = -12.5;
+const OBSTACLES = ['🍺', '🍷', '🥂', '🕶️', '⚽', '🔊', '🔈', '🔉', '📢', '🔔', '🎺', '🥁', '🎤', '🎧', '🎸', '🩴', '🎉', '🪩'];
+const CANVAS_W = 600;
+const CANVAS_H = 600;
+const GROUND_Y = CANVAS_H - 120;
+const PLAYER_X = 80;
+const PLAYER_W = 44;
+const PLAYER_H = 52;
+const OBS_W = 32;
+const OBS_H = 32;
+const GRAVITY = 1.1;
+const JUMP_V = -19;
+const BASE_SPEED = 6;
 
 export function NeymarGame() {
   const { user, profile } = useAuth();
