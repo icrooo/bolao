@@ -9,7 +9,7 @@ import {
 import { format, addDays, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { NeymarGame } from '@/components/NeymarGame';
+
 
 type RankingEntry = {
   user_id: string;
@@ -41,21 +41,7 @@ export default function RankingPage() {
   const [friendshipGroups, setFriendshipGroups] = useState<FriendshipGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [anyMatchStarted, setAnyMatchStarted] = useState<boolean | null>(null);
   const isDark = document.documentElement.classList.contains('dark');
-
-  useEffect(() => {
-    const checkStarted = async () => {
-      const { data, error } = await supabase
-        .from('matches')
-        .select('id')
-        .eq('is_started', true)
-        .limit(1);
-      if (error) { toast.error(error.message); return; }
-      setAnyMatchStarted((data?.length ?? 0) > 0);
-    };
-    checkStarted();
-  }, [ranking]);
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -249,12 +235,9 @@ export default function RankingPage() {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : ranking.length === 0 ? (
-          <>
-            <div className="glass-card p-8 text-center">
-              <p className="text-muted-foreground text-sm">oxi oxi oxi. aguarde, ansioso.</p>
-            </div>
-            {anyMatchStarted === false && <NeymarGame />}
-          </>
+          <div className="glass-card p-8 text-center">
+            <p className="text-muted-foreground text-sm">oxi oxi oxi. aguarde, ansioso.</p>
+          </div>
         ) : (
           <div className="space-y-2">
             {/* Legend */}
