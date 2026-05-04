@@ -234,8 +234,8 @@ export function NeymarGame() {
         <div className="relative w-full overflow-hidden rounded-lg" style={{ background: '#bfe9ff' }}>
           <canvas
             ref={canvasRef}
-            width={600}
-            height={200}
+            width={CANVAS_W}
+            height={CANVAS_H}
             onClick={handleCanvasTap}
             onTouchStart={(e) => { e.preventDefault(); handleCanvasTap(); }}
             className="w-full h-auto block touch-none cursor-pointer"
