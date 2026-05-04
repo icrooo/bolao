@@ -96,11 +96,11 @@ export function NeymarGame() {
     const c2 = ((w + 200 - (s.frame * 0.3) + w * 0.6) % (w + 200)) - 50;
     ctx.fillText('☁️', c1, 110);
     ctx.fillText('☁️', c2, 170);
-    ctx.font = '44px serif';
-    ctx.fillText('🏆', w - 80, 90);
+    ctx.font = '64px serif';
+    ctx.fillText('🏆', w - 100, GROUND_Y + PLAYER_H - 8);
     ctx.fillStyle = '#1f6b3a';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.fillText('COPA DO MUNDO', w - 140, 115);
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('COPA DO MUNDO', w - 130, GROUND_Y + PLAYER_H + 10);
     ctx.fillStyle = '#3a9e6e';
     ctx.fillRect(0, GROUND_Y + PLAYER_H - 4, w, h);
     ctx.fillStyle = '#2d7a55';
@@ -127,9 +127,6 @@ export function NeymarGame() {
     ctx.font = 'bold 16px sans-serif';
     ctx.fillText(`Score: ${s.score}`, 12, 24);
     ctx.fillText(`HI: ${highScore}`, 12, 46);
-    ctx.font = 'bold 11px sans-serif';
-    ctx.fillStyle = '#555';
-    ctx.fillText(`Velocidade: ${s.speed.toFixed(1)}`, 12, 64);
   }, [highScore]);
 
   const loop = useCallback(() => {
@@ -142,17 +139,16 @@ export function NeymarGame() {
     s.vY += GRAVITY;
     s.playerY += s.vY;
     if (s.playerY > GROUND_Y) { s.playerY = GROUND_Y; s.vY = 0; }
-    // Chrome-dino-like progressive acceleration (no cap, keeps getting harder)
-    s.speed = BASE_SPEED + s.frame * 0.004;
-    const minGap = Math.max(26, 90 - s.speed * 3.2);
-    if (s.frame - s.lastSpawn > minGap) {
-      if (Math.random() < 0.88) {
-        s.obstacles.push({ x: canvas.width, emoji: OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)] });
-        if (s.speed > 11 && Math.random() < 0.3) {
-          s.obstacles.push({ x: canvas.width + 38 + Math.random() * 22, emoji: OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)] });
-        }
-        s.lastSpawn = s.frame;
+    // Chrome-dino-like progressive acceleration (2x faster ramp)
+    s.speed = BASE_SPEED + s.frame * 0.008;
+    const baseGap = Math.max(28, 90 - s.speed * 3.2);
+    const randomGap = baseGap + Math.random() * baseGap * 1.6;
+    if (s.frame - s.lastSpawn > randomGap) {
+      s.obstacles.push({ x: canvas.width, emoji: OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)] });
+      if (s.speed > 11 && Math.random() < 0.25) {
+        s.obstacles.push({ x: canvas.width + 38 + Math.random() * 30, emoji: OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)] });
       }
+      s.lastSpawn = s.frame;
     }
     s.obstacles.forEach(o => { o.x -= s.speed; });
     s.obstacles = s.obstacles.filter(o => o.x > -50);
