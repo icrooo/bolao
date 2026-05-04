@@ -96,11 +96,11 @@ export function NeymarGame() {
     const c2 = ((w + 200 - (s.frame * 0.3) + w * 0.6) % (w + 200)) - 50;
     ctx.fillText('☁️', c1, 110);
     ctx.fillText('☁️', c2, 170);
-    ctx.font = '44px serif';
-    ctx.fillText('🏆', w - 80, 90);
+    ctx.font = '64px serif';
+    ctx.fillText('🏆', w - 100, GROUND_Y + PLAYER_H - 8);
     ctx.fillStyle = '#1f6b3a';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.fillText('COPA DO MUNDO', w - 140, 115);
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('COPA DO MUNDO', w - 130, GROUND_Y + PLAYER_H + 10);
     ctx.fillStyle = '#3a9e6e';
     ctx.fillRect(0, GROUND_Y + PLAYER_H - 4, w, h);
     ctx.fillStyle = '#2d7a55';
