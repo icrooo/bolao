@@ -6,15 +6,18 @@ import { Trophy, RotateCcw } from 'lucide-react';
 
 type RankRow = { user_id: string; high_score: number; updated_at: string; name: string };
 
-const OBSTACLES = ['🍺', '🕶️', '⚽', '🔊', '🩴', '🎉'];
-const GROUND_Y = 140;
-const PLAYER_X = 60;
-const PLAYER_W = 36;
-const PLAYER_H = 44;
-const OBS_W = 28;
-const OBS_H = 28;
-const GRAVITY = 0.7;
-const JUMP_V = -12.5;
+const OBSTACLES = ['🍺', '🍷', '🥂', '🕶️', '⚽', '🔊', '🔈', '🔉', '📢', '🔔', '🎺', '🥁', '🎤', '🎧', '🎸', '🩴', '🎉', '🪩'];
+const CANVAS_W = 600;
+const CANVAS_H = 600;
+const GROUND_Y = CANVAS_H - 120;
+const PLAYER_X = 80;
+const PLAYER_W = 44;
+const PLAYER_H = 52;
+const OBS_W = 32;
+const OBS_H = 32;
+const GRAVITY = 1.1;
+const JUMP_V = -19;
+const BASE_SPEED = 6;
 
 export function NeymarGame() {
   const { user, profile } = useAuth();
@@ -29,7 +32,7 @@ export function NeymarGame() {
     playerY: GROUND_Y,
     vY: 0,
     obstacles: [] as { x: number; emoji: string }[],
-    speed: 4,
+    speed: BASE_SPEED,
     frame: 0,
     score: 0,
     running: false,
@@ -81,43 +84,52 @@ export function NeymarGame() {
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number) => {
     const s = stateRef.current;
-    // sky
     const grd = ctx.createLinearGradient(0, 0, 0, h);
     grd.addColorStop(0, '#bfe9ff');
     grd.addColorStop(1, '#e9f7ff');
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, w, h);
-    // distant trophy
-    ctx.font = '28px serif';
-    ctx.fillText('🏆', w - 50, 50);
+    ctx.font = '40px serif';
+    ctx.fillText('☀️', 40, 70);
+    ctx.font = '34px serif';
+    const c1 = ((w + 200 - (s.frame * 0.5)) % (w + 200)) - 50;
+    const c2 = ((w + 200 - (s.frame * 0.3) + w * 0.6) % (w + 200)) - 50;
+    ctx.fillText('☁️', c1, 110);
+    ctx.fillText('☁️', c2, 170);
+    ctx.font = '44px serif';
+    ctx.fillText('🏆', w - 80, 90);
     ctx.fillStyle = '#1f6b3a';
-    ctx.font = 'bold 10px sans-serif';
-    ctx.fillText('COPA DO MUNDO', w - 92, 70);
-    // ground
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText('COPA DO MUNDO', w - 140, 115);
     ctx.fillStyle = '#3a9e6e';
     ctx.fillRect(0, GROUND_Y + PLAYER_H - 4, w, h);
     ctx.fillStyle = '#2d7a55';
-    for (let i = 0; i < w; i += 24) {
-      const off = (i - (s.frame * s.speed) % 24);
-      ctx.fillRect(off, GROUND_Y + PLAYER_H - 4, 12, 4);
+    for (let i = 0; i < w; i += 28) {
+      const off = (i - (s.frame * s.speed) % 28);
+      ctx.fillRect(off, GROUND_Y + PLAYER_H - 4, 14, 5);
     }
-    // player (Neymar)
     const py = s.playerY;
-    ctx.font = 'bold 9px sans-serif';
     ctx.fillStyle = '#000';
-    ctx.fillText('NEYMAR', PLAYER_X - 4, py - 6);
-    ctx.font = '36px serif';
-    ctx.fillText('🏃', PLAYER_X, py + PLAYER_H - 6);
-    // obstacles
-    ctx.font = '24px serif';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('NEYMAR', PLAYER_X - 4, py - 8);
+    // flip horizontally so 🏃 faces right
+    ctx.save();
+    ctx.translate(PLAYER_X + PLAYER_W / 2, 0);
+    ctx.scale(-1, 1);
+    ctx.font = '46px serif';
+    ctx.fillText('🏃', -PLAYER_W / 2, py + PLAYER_H - 4);
+    ctx.restore();
+    ctx.font = '30px serif';
     s.obstacles.forEach(o => {
-      ctx.fillText(o.emoji, o.x, GROUND_Y + PLAYER_H - 6);
+      ctx.fillText(o.emoji, o.x, GROUND_Y + PLAYER_H - 4);
     });
-    // score
     ctx.fillStyle = '#000';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.fillText(`Score: ${s.score}`, 8, 16);
-    ctx.fillText(`HI: ${highScore}`, 8, 32);
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText(`Score: ${s.score}`, 12, 24);
+    ctx.fillText(`HI: ${highScore}`, 12, 46);
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillStyle = '#555';
+    ctx.fillText(`Velocidade: ${s.speed.toFixed(1)}`, 12, 64);
   }, [highScore]);
 
   const loop = useCallback(() => {
@@ -127,35 +139,35 @@ export function NeymarGame() {
     if (!ctx) return;
     const s = stateRef.current;
     s.frame++;
-    // physics
     s.vY += GRAVITY;
     s.playerY += s.vY;
     if (s.playerY > GROUND_Y) { s.playerY = GROUND_Y; s.vY = 0; }
-    // spawn
-    if (s.frame - s.lastSpawn > Math.max(40, 90 - Math.floor(s.frame / 200))) {
-      if (Math.random() < 0.7) {
+    // Chrome-dino-like progressive acceleration (no cap, keeps getting harder)
+    s.speed = BASE_SPEED + s.frame * 0.004;
+    const minGap = Math.max(26, 90 - s.speed * 3.2);
+    if (s.frame - s.lastSpawn > minGap) {
+      if (Math.random() < 0.88) {
         s.obstacles.push({ x: canvas.width, emoji: OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)] });
+        if (s.speed > 11 && Math.random() < 0.3) {
+          s.obstacles.push({ x: canvas.width + 38 + Math.random() * 22, emoji: OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)] });
+        }
         s.lastSpawn = s.frame;
       }
     }
-    // move obstacles
     s.obstacles.forEach(o => { o.x -= s.speed; });
-    s.obstacles = s.obstacles.filter(o => o.x > -40);
-    // collision
+    s.obstacles = s.obstacles.filter(o => o.x > -50);
     for (const o of s.obstacles) {
       if (
-        o.x < PLAYER_X + PLAYER_W - 8 &&
-        o.x + OBS_W > PLAYER_X + 4 &&
-        s.playerY + PLAYER_H > GROUND_Y + PLAYER_H - OBS_H
+        o.x < PLAYER_X + PLAYER_W - 10 &&
+        o.x + OBS_W > PLAYER_X + 6 &&
+        s.playerY + PLAYER_H > GROUND_Y + PLAYER_H - OBS_H + 4
       ) {
         endGame();
         return;
       }
     }
-    // score & speed
-    if (s.frame % 6 === 0) s.score++;
+    if (s.frame % 5 === 0) s.score++;
     setScore(s.score);
-    s.speed = 4 + s.score * 0.012;
 
     draw(ctx, canvas.width, canvas.height);
     s.raf = requestAnimationFrame(loop);
@@ -181,7 +193,7 @@ export function NeymarGame() {
     s.playerY = GROUND_Y;
     s.vY = 0;
     s.obstacles = [];
-    s.speed = 4;
+    s.speed = BASE_SPEED;
     s.frame = 0;
     s.score = 0;
     s.lastSpawn = 0;
@@ -222,8 +234,8 @@ export function NeymarGame() {
         <div className="relative w-full overflow-hidden rounded-lg" style={{ background: '#bfe9ff' }}>
           <canvas
             ref={canvasRef}
-            width={600}
-            height={200}
+            width={CANVAS_W}
+            height={CANVAS_H}
             onClick={handleCanvasTap}
             onTouchStart={(e) => { e.preventDefault(); handleCanvasTap(); }}
             className="w-full h-auto block touch-none cursor-pointer"
