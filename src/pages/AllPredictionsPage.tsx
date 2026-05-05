@@ -131,7 +131,7 @@ export default function AllPredictionsPage() {
   const hasKnockoutMatches = allLockedMatches.some(m => KNOCKOUT_PHASES.includes(m.group_name));
 
   if (allLockedMatches.length === 0) {
-    return <AppLayout><div className="space-y-4"><div className="glass-card p-8 text-center"><p className="text-muted-foreground text-sm">oxi oxi oxi. aguarde, ansioso.</p></div><NeymarGame /></div></AppLayout>;
+    return <AppLayout><div className="glass-card p-8 text-center"><p className="text-muted-foreground text-sm">oxi oxi oxi. aguarde, ansioso.</p></div></AppLayout>;
   }
 
   return (
