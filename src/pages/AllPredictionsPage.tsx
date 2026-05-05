@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/AppLayout';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { NeymarGame } from '@/components/NeymarGame';
+
 
 type Profile = { user_id: string; name: string };
 type Match = { id: string; home_team: string; away_team: string; match_datetime: string; is_finished: boolean; is_started: boolean; home_score: number | null; away_score: number | null; group_name: string };
@@ -131,7 +131,7 @@ export default function AllPredictionsPage() {
   const hasKnockoutMatches = allLockedMatches.some(m => KNOCKOUT_PHASES.includes(m.group_name));
 
   if (allLockedMatches.length === 0) {
-    return <AppLayout><div className="space-y-4"><div className="glass-card p-8 text-center"><p className="text-muted-foreground text-sm">oxi oxi oxi. aguarde, ansioso.</p></div><NeymarGame /></div></AppLayout>;
+    return <AppLayout><div className="glass-card p-8 text-center"><p className="text-muted-foreground text-sm">oxi oxi oxi. aguarde, ansioso.</p></div></AppLayout>;
   }
 
   return (
