@@ -56,8 +56,9 @@ export default function RankingPage() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('scores-realtime')
+      .channel('ranking-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => fetchRanking())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, () => fetchRanking())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [tab, selectedDate, selectedGroup]);
