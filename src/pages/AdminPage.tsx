@@ -490,12 +490,12 @@ export default function AdminPage() {
                         </Button>
                       ) : (
                         <>
-                          <Button size="sm" variant="outline" onClick={() => setConfirmRestart(m.id)}
-                            className="flex-1 text-xs active:scale-95">
+                          <Button size="sm" onClick={() => setConfirmRestart(m.id)}
+                            className="flex-1 text-xs active:scale-95 bg-yellow-200 text-yellow-900 hover:bg-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-200 dark:hover:bg-yellow-900/60">
                             <RotateCcw className="h-3 w-3 mr-1" /> Reiniciar
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => setConfirmFinish(m.id)} disabled={finishingMatch === m.id}
-                            className="flex-1 text-xs active:scale-95">
+                          <Button size="sm" onClick={() => setConfirmFinish(m.id)} disabled={finishingMatch === m.id}
+                            className="flex-1 text-xs active:scale-95 bg-red-200 text-red-900 hover:bg-red-300 dark:bg-red-900/40 dark:text-red-200 dark:hover:bg-red-900/60">
                             {finishingMatch === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '🏁 Encerrar'}
                           </Button>
                         </>
