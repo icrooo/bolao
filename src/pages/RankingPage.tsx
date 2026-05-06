@@ -42,6 +42,7 @@ export default function RankingPage() {
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const isDark = document.documentElement.classList.contains('dark');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -55,16 +56,27 @@ export default function RankingPage() {
   useEffect(() => { fetchRanking(); }, [tab, selectedDate, selectedGroup]);
 
   useEffect(() => {
+    const debouncedFetchRanking = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        fetchRanking({ silent: true });
+      }, 600);
+    };
+
     const channel = supabase
       .channel('ranking-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => fetchRanking())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, () => fetchRanking())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, debouncedFetchRanking)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, debouncedFetchRanking)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      supabase.removeChannel(channel);
+    };
   }, [tab, selectedDate, selectedGroup]);
 
-  const fetchRanking = async () => {
-    setLoading(true);
+  const fetchRanking = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (!silent) setLoading(true);
 
     const groupId = selectedGroup !== 'all' ? selectedGroup : undefined;
 
