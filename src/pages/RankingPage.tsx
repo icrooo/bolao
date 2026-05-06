@@ -86,8 +86,8 @@ export default function RankingPage() {
         p_date: dateStr,
         p_group_id: groupId ?? null,
       });
-      if (error) { toast.error(error.message); setLoading(false); return; }
-      if (!data || data.length === 0) { setRanking([]); setLoading(false); setLastUpdated(new Date()); return; }
+      if (error) { toast.error(error.message); if (!silent) setLoading(false); return; }
+      if (!data || data.length === 0) { setRanking([]); if (!silent) setLoading(false); setLastUpdated(new Date()); return; }
 
       const entries: RankingEntry[] = data.map((r: any) => ({
         user_id: r.out_user_id,
@@ -101,7 +101,7 @@ export default function RankingPage() {
         positionChange: null,
       }));
       setRanking(entries);
-      setLoading(false);
+      if (!silent) setLoading(false);
       setLastUpdated(new Date());
       return;
     }
@@ -111,8 +111,8 @@ export default function RankingPage() {
       p_date: null,
       p_group_id: groupId ?? null,
     });
-    if (currentError) { toast.error(currentError.message); setLoading(false); return; }
-    if (!currentData || currentData.length === 0) { setRanking([]); setLoading(false); setLastUpdated(new Date()); return; }
+    if (currentError) { toast.error(currentError.message); if (!silent) setLoading(false); return; }
+    if (!currentData || currentData.length === 0) { setRanking([]); if (!silent) setLoading(false); setLastUpdated(new Date()); return; }
 
     const entries: RankingEntry[] = currentData.map((r: any) => ({
       user_id: r.out_user_id,
@@ -126,59 +126,8 @@ export default function RankingPage() {
       positionChange: null,
     }));
 
-    // Calculate position change
-    const { data: finishedMatches, error: fmError } = await supabase
-      .from('matches').select('id').eq('is_finished', true);
-    if (!fmError && finishedMatches && finishedMatches.length >= 2) {
-      const { data: allScores, error: asError } = await supabase
-        .from('scores').select('user_id, match_id, points');
-      const { data: fmOrdered } = await supabase
-        .from('matches').select('id').eq('is_finished', true).order('match_datetime', { ascending: false }).limit(1);
-
-      if (!asError && allScores && fmOrdered && fmOrdered.length > 0) {
-        const latestMatchId = fmOrdered[0].id;
-        const prevScores = allScores.filter(s => s.match_id !== latestMatchId);
-        const prevMap = new Map<string, { total: number; exact: number; partial: number; negative: number }>();
-        entries.forEach(e => prevMap.set(e.user_id, { total: 0, exact: 0, partial: 0, negative: 0 }));
-        prevScores.forEach(s => {
-          const entry = prevMap.get(s.user_id);
-          if (!entry) return;
-          entry.total += s.points;
-          if (s.points === 5) entry.exact++;
-          else if (s.points === 2) entry.partial++;
-          else if (s.points === -1) entry.negative++;
-        });
-        const sorted = Array.from(prevMap.entries())
-          .map(([uid, e]) => ({ uid, ...e }))
-          .sort((a, b) => {
-            if (b.total !== a.total) return b.total - a.total;
-            if (b.exact !== a.exact) return b.exact - a.exact;
-            if (b.partial !== a.partial) return b.partial - a.partial;
-            return a.negative - b.negative;
-          });
-        const prevPositions = new Map<string, number>();
-        let pos = 1;
-        for (let i = 0; i < sorted.length; i++) {
-          if (i > 0) {
-            const prev = sorted[i - 1];
-            const curr = sorted[i];
-            if (curr.total !== prev.total || curr.exact !== prev.exact || curr.partial !== prev.partial || curr.negative !== prev.negative) {
-              pos = i + 1;
-            }
-          }
-          prevPositions.set(sorted[i].uid, pos);
-        }
-        entries.forEach(e => {
-          const prevPos = prevPositions.get(e.user_id);
-          if (prevPos !== undefined) {
-            e.positionChange = prevPos - e.position;
-          }
-        });
-      }
-    }
-
     setRanking(entries);
-    setLoading(false);
+    if (!silent) setLoading(false);
     setLastUpdated(new Date());
   };
 
