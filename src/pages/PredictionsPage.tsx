@@ -352,17 +352,17 @@ export default function PredictionsPage() {
 
               return (
                 <div key={match.id} className="glass-card p-4 animate-reveal-up relative" style={{ animationDelay: `${Math.min(i * 60, 300)}ms` }}>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between gap-2 mb-2">
                     <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                       {match.group_name.length === 1 ? `Grupo ${match.group_name}` : match.group_name} · {format(new Date(match.match_datetime), "dd MMM · HH:mm", { locale: ptBR })}
                     </span>
-                    <MatchStatusBadge match={match} serverNow={serverNow} />
+                    <div className="flex items-center gap-2">
+                      {!locked && (
+                        <CountdownTimer datetime={match.match_datetime} serverNow={serverNow} onExpired={handleTimerExpired} />
+                      )}
+                      <MatchStatusBadge match={match} serverNow={serverNow} />
+                    </div>
                   </div>
-
-                  {/* Countdown positioned absolute top-right */}
-                  {!locked && (
-                    <CountdownTimer datetime={match.match_datetime} serverNow={serverNow} onExpired={handleTimerExpired} />
-                  )}
 
                   <div className="grid gap-2" style={{ gridTemplateColumns: '1fr auto 1fr' }}>
                     <div className="flex items-center justify-end gap-1 min-w-0">
