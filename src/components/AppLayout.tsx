@@ -100,20 +100,23 @@ export function AppLayout({ children }: { children: ReactNode }) {
               )}
             </p>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={toggle}
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors active:scale-95"
-              aria-label="Alternar tema"
-            >
-              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </button>
-            <button
-              onClick={signOut}
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors active:scale-95"
-            >
-              <LogOut className="h-5 w-5" />
-            </button>
+          <div className="flex flex-col items-end">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={toggle}
+                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors active:scale-95"
+                aria-label="Alternar tema"
+              >
+                {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              </button>
+              <button
+                onClick={signOut}
+                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors active:scale-95"
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            </div>
+            <span className="text-[9px] text-muted-foreground/60 -mt-0.5 mr-1">v. 1.0 beta</span>
           </div>
         </div>
       </header>
