@@ -187,7 +187,7 @@ export default function RankingPage() {
         {lastUpdated && (
           <div className="text-right">
             <span className="text-[12px] text-muted-foreground">
-              Atualizado às {format(lastUpdated, 'HH:mm:ss', { locale: ptBR })}
+              Último placar atualizado às {format(lastUpdated, 'HH:mm:ss', { locale: ptBR })}
             </span>
           </div>
         )}
