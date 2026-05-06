@@ -72,20 +72,20 @@ function CountdownTimer({ datetime, serverNow, onExpired }: { datetime: string; 
 
   if (secondsLeft <= 3600) {
     return (
-      <span className="absolute top-2.5 right-3 flex items-center gap-1 text-[11px] font-bold text-destructive tabular-nums animate-pulse">
+      <span className="flex items-center gap-1 text-[11px] font-bold text-destructive tabular-nums animate-pulse">
         <Clock className="h-3 w-3" />{timeStr}
       </span>
     );
   }
   if (secondsLeft <= 86400) {
     return (
-      <span className="absolute top-2.5 right-3 flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+      <span className="flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 tabular-nums">
         <AlertCircle className="h-3 w-3" />{timeStr}
       </span>
     );
   }
   return (
-    <span className="absolute top-2.5 right-3 text-[11px] text-muted-foreground tabular-nums">{timeStr}</span>
+    <span className="text-[11px] text-muted-foreground tabular-nums">{timeStr}</span>
   );
 }
 
