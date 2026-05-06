@@ -429,8 +429,8 @@ export default function AdminPage() {
                       {(() => { const url = getFlagUrl(m.away_team, 24); return url ? <img src={url} alt={m.away_team} className="w-5 h-4 object-cover rounded-sm" /> : null; })()}
                       <span className="font-medium text-sm">{m.away_team}</span>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => setConfirmRestart(m.id)}
-                      className="w-full text-xs active:scale-95">
+                    <Button size="sm" onClick={() => setConfirmRestart(m.id)}
+                      className="w-full text-xs active:scale-95 bg-foreground text-background hover:bg-foreground/90">
                       <RotateCcw className="h-3 w-3 mr-1" /> Reiniciar
                     </Button>
                   </div>
