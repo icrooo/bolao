@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useServerTime } from '@/hooks/useServerTime';
@@ -17,8 +17,14 @@ type Match = {
 };
 type Prediction = { id: string; match_id: string; home_score_pred: number; away_score_pred: number };
 type Score = { match_id: string; points: number; is_provisional?: boolean };
-type AllPrediction = { user_id: string; match_id: string; home_score_pred: number; away_score_pred: number };
-type Profile = { user_id: string; name: string };
+
+export type MatchPredictionEntry = {
+  user_id: string;
+  name: string;
+  home_score_pred: number;
+  away_score_pred: number;
+  points: number | null;
+};
 
 const LOCK_MINUTES = 10;
 const KNOCKOUT_PHASES = ['16-AVOS', 'OITAVAS', 'QUARTAS', 'SEMI', '3º e 4º', 'FINAL'];
@@ -108,31 +114,46 @@ function calcPoints(pred: { home_score_pred: number; away_score_pred: number }, 
   return 0;
 }
 
-function ExpandablePredictions({ match, currentUserId, allPredictions, allProfiles, allScores }: {
-  match: Match; currentUserId: string; allPredictions: AllPrediction[]; allProfiles: Profile[];
-  allScores: { user_id: string; match_id: string; points: number }[];
+function ExpandablePredictions({ match, currentUserId, fetchMatchPredictions, cachedEntries, isLoading }: {
+  match: Match;
+  currentUserId: string;
+  fetchMatchPredictions: (matchId: string) => void;
+  cachedEntries: MatchPredictionEntry[] | undefined;
+  isLoading: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const approvedUserIds = new Set(allProfiles.map(pr => pr.user_id));
-  const matchPreds = allPredictions.filter(p => p.match_id === match.id && approvedUserIds.has(p.user_id));
-  const matchScores = allScores.filter(s => s.match_id === match.id);
-  const entries = matchPreds.map(p => {
-    const profile = allProfiles.find(pr => pr.user_id === p.user_id);
-    const score = matchScores.find(s => s.user_id === p.user_id);
-    const partialPts = (match.home_score !== null && match.away_score !== null) ? calcPoints(p, match.home_score, match.away_score) : null;
-    return { user_id: p.user_id, name: profile?.name ?? 'Desconhecido', home_score_pred: p.home_score_pred, away_score_pred: p.away_score_pred, points: score?.points ?? partialPts };
-  });
-  entries.sort((a, b) => { if (a.user_id === currentUserId) return -1; if (b.user_id === currentUserId) return 1; return a.name.localeCompare(b.name); });
+
+  const handleToggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && !cachedEntries && !isLoading) {
+      fetchMatchPredictions(match.id);
+    }
+  };
+
+  const entries = useMemo(() => {
+    if (!cachedEntries) return [];
+    const list = cachedEntries.map(e => {
+      const partialPts = (match.home_score !== null && match.away_score !== null)
+        ? calcPoints({ home_score_pred: e.home_score_pred, away_score_pred: e.away_score_pred }, match.home_score, match.away_score)
+        : null;
+      return { ...e, points: e.points ?? partialPts };
+    });
+    list.sort((a, b) => { if (a.user_id === currentUserId) return -1; if (b.user_id === currentUserId) return 1; return a.name.localeCompare(b.name); });
+    return list;
+  }, [cachedEntries, match.home_score, match.away_score, currentUserId]);
 
   return (
     <div className="mt-2">
-      <button onClick={() => setOpen(!open)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full justify-center py-1">
+      <button onClick={handleToggle} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full justify-center py-1">
         <span>{open ? 'Ocultar palpites' : 'Ver palpites'}</span>
         {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
       </button>
       {open && (
         <div className="mt-2 space-y-1 animate-reveal-up">
-          {entries.length === 0 ? (
+          {isLoading && !cachedEntries ? (
+            <div className="flex justify-center py-3"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+          ) : entries.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-2">Nenhum palpite registrado</p>
           ) : entries.map(e => {
             const getColor = (pts: number | null) => {
@@ -179,21 +200,13 @@ export default function PredictionsPage() {
   const [drafts, setDrafts] = useState<Map<string, { home: number; away: number }>>(new Map());
   const [, forceUpdate] = useState(0);
 
-  const [allPredictions, setAllPredictions] = useState<AllPrediction[]>([]);
-  const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
-  const [allScores, setAllScores] = useState<{ user_id: string; match_id: string; points: number }[]>([]);
+  // Lazy cache for "Ver palpites"
+  const [matchPredictionsCache, setMatchPredictionsCache] = useState<Record<string, MatchPredictionEntry[]>>({});
+  const [loadingMatchPredictions, setLoadingMatchPredictions] = useState<Record<string, boolean>>({});
+  const cacheRef = useRef(matchPredictionsCache);
+  cacheRef.current = matchPredictionsCache;
 
   useEffect(() => { fetchData(); }, [user]);
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('matches-realtime-pred')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' }, () => fetchMatches())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => { fetchScores(); fetchAllScores(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, () => fetchAllPredictions())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user]);
 
   const fetchMatches = async () => {
     const { data, error } = await supabase.from('matches').select('*').order('match_datetime', { ascending: true });
@@ -208,42 +221,80 @@ export default function PredictionsPage() {
     if (data) { const map = new Map<string, Score>(); data.forEach(s => map.set(s.match_id, s)); setScores(map); }
   };
 
-  const fetchAllPredictions = async () => {
-    const { data, error } = await supabase.from('predictions').select('user_id, match_id, home_score_pred, away_score_pred');
-    if (error) { toast.error(error.message); return; }
-    if (data) setAllPredictions(data);
-  };
+  const fetchMatchPredictions = useCallback(async (matchId: string) => {
+    setLoadingMatchPredictions(prev => ({ ...prev, [matchId]: true }));
+    try {
+      const [predRes, scoreRes, profilesRes] = await Promise.all([
+        supabase.from('predictions').select('user_id, home_score_pred, away_score_pred').eq('match_id', matchId),
+        supabase.from('scores').select('user_id, points').eq('match_id', matchId),
+        supabase.from('profiles').select('user_id, name').eq('is_approved', true),
+      ]);
+      if (predRes.error) throw predRes.error;
+      if (scoreRes.error) throw scoreRes.error;
+      if (profilesRes.error) throw profilesRes.error;
 
-  const fetchAllScores = async () => {
-    const { data, error } = await supabase.from('scores').select('user_id, match_id, points');
-    if (error) { toast.error(error.message); return; }
-    if (data) setAllScores(data);
-  };
+      const profileMap = new Map((profilesRes.data ?? []).map(p => [p.user_id, p.name]));
+      const scoreMap = new Map((scoreRes.data ?? []).map(s => [s.user_id, s.points]));
+      const entries: MatchPredictionEntry[] = (predRes.data ?? [])
+        .filter(p => profileMap.has(p.user_id))
+        .map(p => ({
+          user_id: p.user_id,
+          name: profileMap.get(p.user_id) ?? 'Desconhecido',
+          home_score_pred: p.home_score_pred,
+          away_score_pred: p.away_score_pred,
+          points: scoreMap.has(p.user_id) ? (scoreMap.get(p.user_id) as number) : null,
+        }));
+      setMatchPredictionsCache(prev => ({ ...prev, [matchId]: entries }));
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setLoadingMatchPredictions(prev => ({ ...prev, [matchId]: false }));
+    }
+  }, []);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('matches-realtime-pred')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' }, (payload: any) => {
+        fetchMatches();
+        const mid = payload?.new?.id;
+        if (mid && cacheRef.current[mid]) {
+          // refresh cached match predictions if this match's data is open
+          fetchMatchPredictions(mid);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, (payload: any) => {
+        fetchScores();
+        const mid = payload?.new?.match_id ?? payload?.old?.match_id;
+        if (mid && cacheRef.current[mid]) {
+          fetchMatchPredictions(mid);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, (payload: any) => {
+        const mid = payload?.new?.match_id ?? payload?.old?.match_id;
+        if (mid && cacheRef.current[mid]) {
+          fetchMatchPredictions(mid);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, fetchMatchPredictions]);
 
   const fetchData = async () => {
     if (!user) return;
-    const [matchRes, predRes, scoreRes, allPredRes, profilesRes, allScoresRes] = await Promise.all([
+    const [matchRes, predRes, scoreRes] = await Promise.all([
       supabase.from('matches').select('*').order('match_datetime', { ascending: true }),
       supabase.from('predictions').select('*').eq('user_id', user.id),
       supabase.from('scores').select('*').eq('user_id', user.id),
-      supabase.from('predictions').select('user_id, match_id, home_score_pred, away_score_pred'),
-      supabase.from('profiles').select('user_id, name').eq('is_approved', true),
-      supabase.from('scores').select('user_id, match_id, points'),
     ]);
 
     if (matchRes.error) { toast.error(matchRes.error.message); }
     if (predRes.error) { toast.error(predRes.error.message); }
     if (scoreRes.error) { toast.error(scoreRes.error.message); }
-    if (allPredRes.error) { toast.error(allPredRes.error.message); }
-    if (profilesRes.error) { toast.error(profilesRes.error.message); }
-    if (allScoresRes.error) { toast.error(allScoresRes.error.message); }
 
     if (matchRes.data) setMatches(matchRes.data as Match[]);
     if (predRes.data) { const map = new Map<string, Prediction>(); predRes.data.forEach(p => map.set(p.match_id, p)); setPredictions(map); }
     if (scoreRes.data) { const map = new Map<string, Score>(); scoreRes.data.forEach(s => map.set(s.match_id, s)); setScores(map); }
-    if (allPredRes.data) setAllPredictions(allPredRes.data);
-    if (profilesRes.data) setAllProfiles(profilesRes.data);
-    if (allScoresRes.data) setAllScores(allScoresRes.data);
     setLoading(false);
   };
 
@@ -310,8 +361,6 @@ export default function PredictionsPage() {
       setSaving(null);
     }
   };
-
-  const hasDraftChanged = (matchId: string) => { const draft = drafts.get(matchId); if (!draft) return false; const pred = predictions.get(matchId); if (!pred) return true; return draft.home !== pred.home_score_pred || draft.away !== pred.away_score_pred; };
 
   const getButtonState = (matchId: string) => {
     const pred = predictions.get(matchId);
@@ -414,7 +463,13 @@ export default function PredictionsPage() {
                   )}
 
                   {locked && (
-                    <ExpandablePredictions match={match} currentUserId={user?.id ?? ''} allPredictions={allPredictions} allProfiles={allProfiles} allScores={allScores} />
+                    <ExpandablePredictions
+                      match={match}
+                      currentUserId={user?.id ?? ''}
+                      fetchMatchPredictions={fetchMatchPredictions}
+                      cachedEntries={matchPredictionsCache[match.id]}
+                      isLoading={!!loadingMatchPredictions[match.id]}
+                    />
                   )}
                 </div>
               );
