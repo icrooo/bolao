@@ -46,24 +46,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      applySession(session);
-    });
+    let isMounted = true;
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
       applySession(session);
+      if (!session) setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isMounted) return;
+      if (event === 'SIGNED_OUT') {
+        applySession(null);
+        setLoading(false);
+        return;
+      }
+      if (session) {
+        applySession(session);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
     if (!user) {
       setProfile(null);
       setIsAdmin(false);
-      setLoading(false);
       return;
     }
+
+    let cancelled = false;
+    setLoading(true);
 
     const fetchProfile = async () => {
       const { data: profileData } = await supabase
@@ -71,6 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select('*')
         .eq('user_id', user.id)
         .single();
+
+      if (cancelled) return;
 
       if (profileData) {
         setProfile({ name: profileData.name, is_approved: profileData.is_approved, user_id: profileData.user_id });
@@ -81,11 +100,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select('role')
         .eq('user_id', user.id);
 
+      if (cancelled) return;
+
       setIsAdmin(roleData?.some(r => r.role === 'admin') ?? false);
       setLoading(false);
     };
 
     fetchProfile();
+    return () => { cancelled = true; };
   }, [user]);
 
   const signOut = async () => {
