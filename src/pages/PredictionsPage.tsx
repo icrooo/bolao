@@ -521,6 +521,8 @@ export default function PredictionsPage() {
                       fetchMatchPredictions={fetchMatchPredictions}
                       cachedEntries={matchPredictionsCache[match.id]}
                       isLoading={!!loadingMatchPredictions[match.id]}
+                      positionByUser={positionByUser}
+                      sharedGroupsByUser={sharedGroupsByUser}
                     />
                   )}
                 </div>
