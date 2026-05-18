@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.snapshot_predictions() FROM PUBLIC, anon, authenticated;

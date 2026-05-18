@@ -98,6 +98,51 @@ export type Database = {
         }
         Relationships: []
       }
+      prediction_snapshots: {
+        Row: {
+          away_score_pred: number
+          away_team: string
+          email: string | null
+          home_score_pred: number
+          home_team: string
+          id: string
+          last_prediction_at: string
+          match_id: string
+          name: string
+          prediction_id: string
+          snapshot_at: string
+          user_id: string
+        }
+        Insert: {
+          away_score_pred: number
+          away_team: string
+          email?: string | null
+          home_score_pred: number
+          home_team: string
+          id?: string
+          last_prediction_at: string
+          match_id: string
+          name: string
+          prediction_id: string
+          snapshot_at?: string
+          user_id: string
+        }
+        Update: {
+          away_score_pred?: number
+          away_team?: string
+          email?: string | null
+          home_score_pred?: number
+          home_team?: string
+          id?: string
+          last_prediction_at?: string
+          match_id?: string
+          name?: string
+          prediction_id?: string
+          snapshot_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       predictions: {
         Row: {
           away_score_pred: number
@@ -277,6 +322,7 @@ export type Database = {
         Returns: boolean
       }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
+      snapshot_predictions: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"
