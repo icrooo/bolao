@@ -114,12 +114,14 @@ function calcPoints(pred: { home_score_pred: number; away_score_pred: number }, 
   return 0;
 }
 
-function ExpandablePredictions({ match, currentUserId, fetchMatchPredictions, cachedEntries, isLoading }: {
+function ExpandablePredictions({ match, currentUserId, fetchMatchPredictions, cachedEntries, isLoading, positionByUser, sharedGroupsByUser }: {
   match: Match;
   currentUserId: string;
   fetchMatchPredictions: (matchId: string) => void;
   cachedEntries: MatchPredictionEntry[] | undefined;
   isLoading: boolean;
+  positionByUser: Map<string, number>;
+  sharedGroupsByUser: Map<string, string[]>;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -172,9 +174,21 @@ function ExpandablePredictions({ match, currentUserId, fetchMatchPredictions, ca
               return '';
             };
             const emoji = getScoreEmoji(e.points);
+            const pos = positionByUser.get(e.user_id);
+            const shared = sharedGroupsByUser.get(e.user_id) ?? [];
             return (
               <div key={e.user_id} className={`flex items-center justify-between px-3 py-1.5 rounded-md text-xs ${e.user_id === currentUserId ? 'bg-primary/5 font-semibold' : 'bg-secondary/50'}`}>
-                <div className="flex items-center gap-2 flex-1 min-w-0"><span className="truncate">{e.name}</span></div>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                    {pos !== undefined && (
+                      <span className="text-muted-foreground tabular-nums shrink-0">[{pos}º]</span>
+                    )}
+                    <span className="truncate">{e.name}</span>
+                    {shared.map(g => (
+                      <span key={g} className="inline-block px-1.5 py-0.5 rounded-full bg-accent/40 text-accent-foreground text-[9px] font-medium uppercase tracking-wide shrink-0">{g}</span>
+                    ))}
+                  </span>
+                </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${getColor(e.points)}`}>{e.home_score_pred}×{e.away_score_pred}</span>
                   {emoji && <span className="text-sm">{emoji}</span>}
@@ -214,12 +228,50 @@ export default function PredictionsPage() {
     if (data) setMatches(data as Match[]);
   };
 
+  const [positionByUser, setPositionByUser] = useState<Map<string, number>>(new Map());
+  const [sharedGroupsByUser, setSharedGroupsByUser] = useState<Map<string, string[]>>(new Map());
+
   const fetchScores = async () => {
     if (!user) return;
     const { data, error } = await supabase.from('scores').select('*').eq('user_id', user.id);
     if (error) { toast.error(error.message); return; }
     if (data) { const map = new Map<string, Score>(); data.forEach(s => map.set(s.match_id, s)); setScores(map); }
   };
+
+  const fetchRanking = useCallback(async () => {
+    const { data, error } = await supabase.rpc('get_ranking', {});
+    if (error) return;
+    const map = new Map<string, number>();
+    (data ?? []).forEach((r: any) => map.set(r.out_user_id, r.out_position));
+    setPositionByUser(map);
+  }, []);
+
+  const fetchSharedGroups = useCallback(async () => {
+    if (!user) { setSharedGroupsByUser(new Map()); return; }
+    const { data: myGroups } = await supabase
+      .from('user_friendship_groups')
+      .select('group_id')
+      .eq('user_id', user.id);
+    const groupIds = (myGroups ?? []).map(g => g.group_id);
+    if (groupIds.length === 0) { setSharedGroupsByUser(new Map()); return; }
+    const [{ data: members }, { data: groups }] = await Promise.all([
+      supabase.from('user_friendship_groups').select('user_id, group_id').in('group_id', groupIds),
+      supabase.from('friendship_groups').select('id, name').in('id', groupIds),
+    ]);
+    const groupNameById = new Map((groups ?? []).map(g => [g.id, g.name]));
+    const map = new Map<string, string[]>();
+    (members ?? []).forEach(m => {
+      if (m.user_id === user.id) return;
+      const name = groupNameById.get(m.group_id);
+      if (!name) return;
+      const arr = map.get(m.user_id) ?? [];
+      if (!arr.includes(name)) arr.push(name);
+      map.set(m.user_id, arr);
+    });
+    setSharedGroupsByUser(map);
+  }, [user]);
+
+  useEffect(() => { fetchRanking(); fetchSharedGroups(); }, [fetchRanking, fetchSharedGroups]);
 
   const fetchMatchPredictions = useCallback(async (matchId: string) => {
     setLoadingMatchPredictions(prev => ({ ...prev, [matchId]: true }));
@@ -469,6 +521,8 @@ export default function PredictionsPage() {
                       fetchMatchPredictions={fetchMatchPredictions}
                       cachedEntries={matchPredictionsCache[match.id]}
                       isLoading={!!loadingMatchPredictions[match.id]}
+                      positionByUser={positionByUser}
+                      sharedGroupsByUser={sharedGroupsByUser}
                     />
                   )}
                 </div>
