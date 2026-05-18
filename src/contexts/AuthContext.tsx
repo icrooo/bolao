@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -28,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<AuthContextType['profile']>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const authReadyRef = useRef(false);
 
   useEffect(() => {
     const applySession = (newSession: Session | null) => {
@@ -46,18 +47,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      applySession(session);
-    });
+    let isMounted = true;
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
       applySession(session);
+      authReadyRef.current = true;
     });
 
-    return () => subscription.unsubscribe();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isMounted) return;
+      if (event === 'SIGNED_OUT') {
+        applySession(null);
+        authReadyRef.current = true;
+        return;
+      }
+      if (session) {
+        applySession(session);
+        authReadyRef.current = true;
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
+    if (!authReadyRef.current) return;
+
     if (!user) {
       setProfile(null);
       setIsAdmin(false);
@@ -65,12 +84,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    let cancelled = false;
+    setLoading(true);
+
     const fetchProfile = async () => {
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', user.id)
         .single();
+
+      if (cancelled) return;
 
       if (profileData) {
         setProfile({ name: profileData.name, is_approved: profileData.is_approved, user_id: profileData.user_id });
@@ -81,11 +105,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select('role')
         .eq('user_id', user.id);
 
+      if (cancelled) return;
+
       setIsAdmin(roleData?.some(r => r.role === 'admin') ?? false);
       setLoading(false);
     };
 
     fetchProfile();
+    return () => { cancelled = true; };
   }, [user]);
 
   const signOut = async () => {
