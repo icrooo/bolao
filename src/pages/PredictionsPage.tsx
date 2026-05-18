@@ -114,12 +114,14 @@ function calcPoints(pred: { home_score_pred: number; away_score_pred: number }, 
   return 0;
 }
 
-function ExpandablePredictions({ match, currentUserId, fetchMatchPredictions, cachedEntries, isLoading }: {
+function ExpandablePredictions({ match, currentUserId, fetchMatchPredictions, cachedEntries, isLoading, positionByUser, sharedGroupsByUser }: {
   match: Match;
   currentUserId: string;
   fetchMatchPredictions: (matchId: string) => void;
   cachedEntries: MatchPredictionEntry[] | undefined;
   isLoading: boolean;
+  positionByUser: Map<string, number>;
+  sharedGroupsByUser: Map<string, string[]>;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -172,9 +174,21 @@ function ExpandablePredictions({ match, currentUserId, fetchMatchPredictions, ca
               return '';
             };
             const emoji = getScoreEmoji(e.points);
+            const pos = positionByUser.get(e.user_id);
+            const shared = sharedGroupsByUser.get(e.user_id) ?? [];
             return (
               <div key={e.user_id} className={`flex items-center justify-between px-3 py-1.5 rounded-md text-xs ${e.user_id === currentUserId ? 'bg-primary/5 font-semibold' : 'bg-secondary/50'}`}>
-                <div className="flex items-center gap-2 flex-1 min-w-0"><span className="truncate">{e.name}</span></div>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                    {pos !== undefined && (
+                      <span className="text-muted-foreground tabular-nums shrink-0">[{pos}º]</span>
+                    )}
+                    <span className="truncate">{e.name}</span>
+                    {shared.map(g => (
+                      <span key={g} className="inline-block px-1.5 py-0.5 rounded-full bg-accent/40 text-accent-foreground text-[9px] font-medium uppercase tracking-wide shrink-0">{g}</span>
+                    ))}
+                  </span>
+                </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${getColor(e.points)}`}>{e.home_score_pred}×{e.away_score_pred}</span>
                   {emoji && <span className="text-sm">{emoji}</span>}
