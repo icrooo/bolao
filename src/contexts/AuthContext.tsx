@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -28,7 +28,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<AuthContextType['profile']>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const authReadyRef = useRef(false);
 
   useEffect(() => {
     const applySession = (newSession: Session | null) => {
@@ -52,19 +51,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!isMounted) return;
       applySession(session);
-      authReadyRef.current = true;
+      if (!session) setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
       if (event === 'SIGNED_OUT') {
         applySession(null);
-        authReadyRef.current = true;
+        setLoading(false);
         return;
       }
       if (session) {
         applySession(session);
-        authReadyRef.current = true;
       }
     });
 
@@ -75,12 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!authReadyRef.current) return;
-
     if (!user) {
       setProfile(null);
       setIsAdmin(false);
-      setLoading(false);
       return;
     }
 
