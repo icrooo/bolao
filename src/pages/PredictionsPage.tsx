@@ -228,12 +228,50 @@ export default function PredictionsPage() {
     if (data) setMatches(data as Match[]);
   };
 
+  const [positionByUser, setPositionByUser] = useState<Map<string, number>>(new Map());
+  const [sharedGroupsByUser, setSharedGroupsByUser] = useState<Map<string, string[]>>(new Map());
+
   const fetchScores = async () => {
     if (!user) return;
     const { data, error } = await supabase.from('scores').select('*').eq('user_id', user.id);
     if (error) { toast.error(error.message); return; }
     if (data) { const map = new Map<string, Score>(); data.forEach(s => map.set(s.match_id, s)); setScores(map); }
   };
+
+  const fetchRanking = useCallback(async () => {
+    const { data, error } = await supabase.rpc('get_ranking', {});
+    if (error) return;
+    const map = new Map<string, number>();
+    (data ?? []).forEach((r: any) => map.set(r.out_user_id, r.out_position));
+    setPositionByUser(map);
+  }, []);
+
+  const fetchSharedGroups = useCallback(async () => {
+    if (!user) { setSharedGroupsByUser(new Map()); return; }
+    const { data: myGroups } = await supabase
+      .from('user_friendship_groups')
+      .select('group_id')
+      .eq('user_id', user.id);
+    const groupIds = (myGroups ?? []).map(g => g.group_id);
+    if (groupIds.length === 0) { setSharedGroupsByUser(new Map()); return; }
+    const [{ data: members }, { data: groups }] = await Promise.all([
+      supabase.from('user_friendship_groups').select('user_id, group_id').in('group_id', groupIds),
+      supabase.from('friendship_groups').select('id, name').in('id', groupIds),
+    ]);
+    const groupNameById = new Map((groups ?? []).map(g => [g.id, g.name]));
+    const map = new Map<string, string[]>();
+    (members ?? []).forEach(m => {
+      if (m.user_id === user.id) return;
+      const name = groupNameById.get(m.group_id);
+      if (!name) return;
+      const arr = map.get(m.user_id) ?? [];
+      if (!arr.includes(name)) arr.push(name);
+      map.set(m.user_id, arr);
+    });
+    setSharedGroupsByUser(map);
+  }, [user]);
+
+  useEffect(() => { fetchRanking(); fetchSharedGroups(); }, [fetchRanking, fetchSharedGroups]);
 
   const fetchMatchPredictions = useCallback(async (matchId: string) => {
     setLoadingMatchPredictions(prev => ({ ...prev, [matchId]: true }));
