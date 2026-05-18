@@ -322,7 +322,15 @@ export type Database = {
         Returns: boolean
       }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
+      schedule_match_snapshot: {
+        Args: { p_match_id: string }
+        Returns: undefined
+      }
       snapshot_predictions: { Args: never; Returns: undefined }
+      snapshot_predictions_for_match: {
+        Args: { p_match_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "user"
