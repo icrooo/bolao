@@ -218,7 +218,7 @@ export default function RankingPage() {
           </div>
         ) : ranking.length === 0 ? (
           <div className="glass-card p-8 text-center">
-            <p className="text-muted-foreground text-sm">oxi oxi oxi. aguarde, ansioso.</p>
+            <p className="text-muted-foreground text-sm">oxi oxi oxi. aguarde, ansioso.<br /><br />você vai poder ver os placares de todo mundo 10 minutos antes da partida começar.</p>
           </div>
         ) : (
           <div className="space-y-2">
