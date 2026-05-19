@@ -19,9 +19,9 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="glass-card p-8 text-center max-w-sm">
-          <h2 className="text-2xl mb-2">Aguardando aprovação</h2>
+          <h2 className="text-2xl mb-2">​HORA DO PIX!!!</h2>
           <p className="text-muted-foreground text-sm">
-            Seu cadastro foi recebido e está pendente de aprovação pelo administrador.
+            Seu cadastro foi recebido. <br /><br />Agora é só fazer a zorra do pix e me encher o saco para te aprovar.
           </p>
         </div>
       </div>
