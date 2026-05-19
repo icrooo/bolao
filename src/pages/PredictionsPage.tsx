@@ -242,7 +242,7 @@ export default function PredictionsPage() {
     const { data, error } = await supabase.rpc('get_ranking', {});
     if (error) return;
     const map = new Map<string, number>();
-    (data ?? []).forEach((r: any) => map.set(r.out_user_id, r.out_position));
+    (data ?? []).forEach((r) => map.set(r.out_user_id, r.out_position));
     setPositionByUser(map);
   }, []);
 
