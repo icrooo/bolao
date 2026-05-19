@@ -41,7 +41,15 @@ export default function RankingPage() {
   const [friendshipGroups, setFriendshipGroups] = useState<FriendshipGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const isDark = document.documentElement.classList.contains('dark');
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
+  useEffect(() => {
+    const root = document.documentElement;
+    const update = () => setIsDark(root.classList.contains('dark'));
+    update();
+    const obs = new MutationObserver(update);
+    obs.observe(root, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
