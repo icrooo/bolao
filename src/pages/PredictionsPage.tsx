@@ -407,8 +407,8 @@ export default function PredictionsPage() {
       }
       await fetchData();
       setDrafts(prev => { const n = new Map(prev); n.delete(match.id); return n; });
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(null);
     }
