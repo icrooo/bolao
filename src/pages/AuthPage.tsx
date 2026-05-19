@@ -30,9 +30,9 @@ export default function AuthPage() {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="glass-card p-8 text-center max-w-sm animate-reveal-up">
-          <h2 className="text-2xl mb-2">Aguardando aprovação</h2>
+          <h2 className="text-2xl mb-2">​HORA DO PIX!!!</h2>
           <p className="text-muted-foreground text-sm mb-4">
-            Seu cadastro foi recebido. Um administrador precisa aprovar seu acesso.
+            Seu cadastro foi recebido. <br /><br />Agora é só fazer a zorra do pix e me encher o saco para te aprovar.
           </p>
           <Button variant="outline" onClick={() => supabase.auth.signOut()}>
             Sair
