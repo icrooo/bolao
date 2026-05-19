@@ -90,7 +90,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-40 glass-card rounded-none border-b border-border/50 px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <div>
-            <h1 className="text-lg leading-tight">Bolão Copa 2026</h1>
+            <h1 className="text-lg leading-tight">Rebolão Copa 2026</h1>
             <p className="text-xs text-muted-foreground">
               {profile?.name}
               {rank && (
