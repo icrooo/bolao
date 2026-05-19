@@ -34,9 +34,26 @@ export default function AuthPage() {
           <p className="text-muted-foreground text-sm mb-4">
             Seu cadastro foi recebido. <br /><br />Agora é só fazer a zorra do pix e me encher o saco para te aprovar.
           </p>
-          <Button variant="outline" onClick={() => supabase.auth.signOut()}>
-            Sair
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText('icarodias@gmail.com');
+                  toast.success('Chave PIX copiada!');
+                } catch {
+                  toast.error('Não foi possível copiar.');
+                }
+              }}
+            >
+              Copiar Chave PIX
+            </Button>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Atualizar
+            </Button>
+            <Button variant="ghost" onClick={() => supabase.auth.signOut()}>
+              Sair
+            </Button>
+          </div>
         </div>
       </div>
     );
