@@ -74,30 +74,6 @@ export type Database = {
         }
         Relationships: []
       }
-      neymar_game_scores: {
-        Row: {
-          created_at: string
-          high_score: number
-          id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          high_score?: number
-          id?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          high_score?: number
-          id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       prediction_snapshots: {
         Row: {
           away_score_pred: number

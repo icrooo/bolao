@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public.neymar_game_scores;
