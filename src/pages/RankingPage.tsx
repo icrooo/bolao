@@ -89,7 +89,7 @@ export default function RankingPage() {
       if (error) { toast.error(error.message); if (!silent) setLoading(false); return; }
       if (!data || data.length === 0) { setRanking([]); if (!silent) setLoading(false); await refreshLastUpdated(); return; }
 
-      const entries: RankingEntry[] = data.map((r: any) => ({
+      const entries: RankingEntry[] = data.map((r) => ({
         user_id: r.out_user_id,
         name: r.out_name,
         total_points: Number(r.out_total_points),
