@@ -180,7 +180,7 @@ export default function AdminPage() {
     const newVal = Math.max(0, current + delta);
     const otherField = field === 'home_score' ? 'away_score' : 'home_score';
     setUpdatingScore(matchId);
-    const updatePayload: any = { [field]: newVal };
+    const updatePayload: Record<string, number> = { [field]: newVal };
     if (match[otherField] === null) updatePayload[otherField] = 0;
     const { error } = await supabase.from('matches').update(updatePayload).eq('id', matchId);
     if (error) { toast.error(error.message); setUpdatingScore(null); return; }
