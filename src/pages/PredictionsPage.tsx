@@ -307,7 +307,7 @@ export default function PredictionsPage() {
   useEffect(() => {
     const channel = supabase
       .channel('matches-realtime-pred')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' }, (payload: any) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' }, (payload: { new?: { id?: string } }) => {
         fetchMatches();
         const mid = payload?.new?.id;
         if (mid && cacheRef.current[mid]) {
@@ -315,14 +315,14 @@ export default function PredictionsPage() {
           fetchMatchPredictions(mid);
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, (payload: any) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, (payload: { new?: { match_id?: string }; old?: { match_id?: string } }) => {
         fetchScores();
         const mid = payload?.new?.match_id ?? payload?.old?.match_id;
         if (mid && cacheRef.current[mid]) {
           fetchMatchPredictions(mid);
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, (payload: any) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, (payload: { new?: { match_id?: string }; old?: { match_id?: string } }) => {
         const mid = payload?.new?.match_id ?? payload?.old?.match_id;
         if (mid && cacheRef.current[mid]) {
           fetchMatchPredictions(mid);
