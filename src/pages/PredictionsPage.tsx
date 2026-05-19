@@ -297,8 +297,8 @@ export default function PredictionsPage() {
           points: scoreMap.has(p.user_id) ? (scoreMap.get(p.user_id) as number) : null,
         }));
       setMatchPredictionsCache(prev => ({ ...prev, [matchId]: entries }));
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setLoadingMatchPredictions(prev => ({ ...prev, [matchId]: false }));
     }
