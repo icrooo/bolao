@@ -80,8 +80,8 @@ export default function AuthPage() {
         if (error) throw error;
         toast.success('Cadastro realizado! Aguarde aprovação do administrador.');
       }
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error));
     } finally {
       setSubmitting(false);
     }
@@ -97,8 +97,8 @@ export default function AuthPage() {
       if (error) throw error;
       toast.success('E-mail de recuperação enviado! Verifique sua caixa de entrada.');
       setForgotPassword(false);
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error));
     } finally {
       setSubmitting(false);
     }

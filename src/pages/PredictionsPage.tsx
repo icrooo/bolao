@@ -242,7 +242,7 @@ export default function PredictionsPage() {
     const { data, error } = await supabase.rpc('get_ranking', {});
     if (error) return;
     const map = new Map<string, number>();
-    (data ?? []).forEach((r: any) => map.set(r.out_user_id, r.out_position));
+    (data ?? []).forEach((r) => map.set(r.out_user_id, r.out_position));
     setPositionByUser(map);
   }, []);
 
@@ -297,8 +297,8 @@ export default function PredictionsPage() {
           points: scoreMap.has(p.user_id) ? (scoreMap.get(p.user_id) as number) : null,
         }));
       setMatchPredictionsCache(prev => ({ ...prev, [matchId]: entries }));
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setLoadingMatchPredictions(prev => ({ ...prev, [matchId]: false }));
     }
@@ -307,7 +307,7 @@ export default function PredictionsPage() {
   useEffect(() => {
     const channel = supabase
       .channel('matches-realtime-pred')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' }, (payload: any) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' }, (payload: { new?: { id?: string } }) => {
         fetchMatches();
         const mid = payload?.new?.id;
         if (mid && cacheRef.current[mid]) {
@@ -315,14 +315,14 @@ export default function PredictionsPage() {
           fetchMatchPredictions(mid);
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, (payload: any) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, (payload: { new?: { match_id?: string }; old?: { match_id?: string } }) => {
         fetchScores();
         const mid = payload?.new?.match_id ?? payload?.old?.match_id;
         if (mid && cacheRef.current[mid]) {
           fetchMatchPredictions(mid);
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, (payload: any) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, (payload: { new?: { match_id?: string }; old?: { match_id?: string } }) => {
         const mid = payload?.new?.match_id ?? payload?.old?.match_id;
         if (mid && cacheRef.current[mid]) {
           fetchMatchPredictions(mid);
@@ -407,8 +407,8 @@ export default function PredictionsPage() {
       }
       await fetchData();
       setDrafts(prev => { const n = new Map(prev); n.delete(match.id); return n; });
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(null);
     }

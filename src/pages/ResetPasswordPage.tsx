@@ -43,8 +43,8 @@ export default function ResetPasswordPage() {
       if (error) throw error;
       toast.success('Senha atualizada com sucesso!');
       navigate('/predictions');
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error));
     } finally {
       setSubmitting(false);
     }
