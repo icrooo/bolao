@@ -116,11 +116,11 @@ export default function RankingPage() {
     if (!currentData || currentData.length === 0) { setRanking([]); if (!silent) setLoading(false); await refreshLastUpdated(); return; }
 
     const finishedPositions = new Map<string, number>();
-    (finishedRes.data ?? []).forEach((r: any) => {
+    (finishedRes.data ?? []).forEach((r) => {
       finishedPositions.set(r.out_user_id, r.out_position);
     });
 
-    const entries: RankingEntry[] = currentData.map((r: any) => {
+    const entries: RankingEntry[] = currentData.map((r) => {
       const baseline = finishedPositions.get(r.out_user_id);
       // positive = subiu (foi de posição maior para menor); negative = caiu
       const change = baseline != null ? baseline - r.out_position : null;
