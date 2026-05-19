@@ -126,6 +126,7 @@ export type Database = {
           home_score_pred: number
           id: string
           match_id: string
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -134,6 +135,7 @@ export type Database = {
           home_score_pred: number
           id?: string
           match_id: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -142,6 +144,7 @@ export type Database = {
           home_score_pred?: number
           id?: string
           match_id?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
