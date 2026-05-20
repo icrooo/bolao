@@ -234,7 +234,7 @@ export default function RankingPage() {
             <div className="flex items-center justify-center gap-4 py-2 px-3 rounded-lg bg-secondary/50 text-[10px] text-muted-foreground">
               <span>+5 = <span className="font-bold text-green-600">EXATO</span></span>
               <span>+2 = <span className="font-bold text-yellow-600">QUASE</span></span>
-              <span>-1 = <span className="font-bold text-destructive">INVERSO</span></span>
+              <span>-1 = <span className="font-bold text-destructive">INVERTIDO</span></span>
               <span>-2 = <span className="font-bold text-score-missed">ESQUECEU</span></span>
             </div>
             {ranking.map((entry, i) => {
