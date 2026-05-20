@@ -58,6 +58,7 @@ export default {
           partial: "hsl(var(--score-partial))",
           miss: "hsl(var(--score-miss))",
           negative: "hsl(var(--score-negative))",
+          missed: "hsl(var(--score-missed))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
