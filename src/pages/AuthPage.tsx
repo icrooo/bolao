@@ -108,7 +108,7 @@ export default function AuthPage() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm animate-reveal-up">
         <div className="text-center mb-8">
-          <h1 className="font-serif text-4xl mb-1" style={{ lineHeight: '1.1' }}>REBOLÃO</h1>
+          <h1 className="font-serif text-4xl mb-1" style={{ lineHeight: '1.1' }}>Rebolão da Copa</h1>
           <p className="font-serif text-5xl text-primary" style={{ lineHeight: '1.1' }}>2026</p>
           <p className="text-muted-foreground text-sm mt-3">
             {forgotPassword ? 'Informe seu e-mail para recuperar a senha' : isLogin ? 'Entre para acessar seus palpites' : 'Solicite seu acesso ao bolão'}
