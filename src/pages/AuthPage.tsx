@@ -31,6 +31,7 @@ function useTheme() {
 
 export default function AuthPage() {
   const { user, profile, loading } = useAuth();
+  const { theme, toggle } = useTheme();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
