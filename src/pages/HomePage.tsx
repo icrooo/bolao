@@ -94,7 +94,7 @@ export default function HomePage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h4 className="font-medium">ERROU</h4>
-                <p className="text-sm text-muted-foreground">Não acertou nem o placar nem a tendência.</p>
+                <p className="text-sm text-muted-foreground">Não acertou nada.</p>
                 <p className="text-xs text-muted-foreground mt-1">Ex.: palpite 2x1 · resultado 1x1</p>
               </div>
               <span className="font-serif text-xl text-muted-foreground whitespace-nowrap">0</span>
