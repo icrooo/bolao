@@ -7,6 +7,28 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2, Eye, EyeOff, Moon, Sun } from 'lucide-react';
 
+function useTheme() {
+  const [theme, setThemeState] = useState<'light' | 'dark'>(() => {
+    if (typeof window === 'undefined') return 'light';
+    const stored = localStorage.getItem('theme');
+    if (stored === 'dark' || stored === 'light') return stored;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggle = () => setThemeState(t => t === 'dark' ? 'light' : 'dark');
+  return { theme, toggle };
+}
+
 export default function AuthPage() {
   const { user, profile, loading } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
