@@ -1,48 +1,33 @@
+## Plano — Fonte FWC 26 nos títulos
 
+### Pré-requisito
+Você envia os arquivos da fonte FWC 26 no chat (idealmente `.woff2`; `.ttf`/`.otf` também servem). Se forem múltiplos pesos, mande todos.
 
-## Plano de implementação — 5 melhorias
+### Passos
 
-### 1. `/all-predictions` — Ordem alfabética + posição no ranking
-- Ordenar `profiles` alfabeticamente por `name` antes de renderizar as linhas.
-- Buscar dados de `scores` e calcular ranking (mesma lógica de `RankingPage`) para obter a posição de cada usuário.
-- Exibir no nome: `{profile.name} [{posição}]`.
-- Remover o pseudo-elemento `after:` (barra vertical separadora) da coluna sticky de nome e dos cabeçalhos.
-- Reduzir `gap`/`padding` entre a coluna de nomes e a primeira coluna de jogos.
+1. **Salvar a fonte no projeto**
+   - Copiar os arquivos enviados para `public/fonts/` (ex.: `public/fonts/FWC26-Bold.woff2`).
 
-### 2. `/predictions` — Texto descritivo no "Ver palpites" em vez de coluna de pontuação
-No componente `ExpandablePredictions`:
-- Remover a coluna `{e.points > 0 ? '+' : ''}{e.points}` (span de pontos numéricos).
-- Entre o nome do usuário e o placar, inserir um texto em itálico e cinza baseado nos pontos:
-  - `+5` → *"brocandooo"*
-  - `+2` → *"tá quaseee"*
-  - `0` → *"na torcida ainda"*
-  - `-1` → *"KKKKKKK"*
-- Mostrar o texto apenas quando `points !== null` (jogo iniciado).
+2. **Registrar a fonte via `@font-face`**
+   - Em `src/index.css`, adicionar um bloco `@font-face` com `font-family: 'FWC 26'`, `font-display: swap` apontando para os arquivos em `/fonts/...`.
 
-### 3. `/predictions` — Filtro PRÓXIMOS JOGOS não esconder jogos encerrados
-Alterar a lógica do filtro `PRÓXIMOS JOGOS`:
-- Calcular a janela de 24h (4AM Salvador como corte) igual a hoje.
-- Filtrar jogos cujo `match_datetime` está dentro dessa janela, **independente de `is_finished`**.
-- Remover o `!m.is_finished` do filtro.
-- Se não houver jogos na janela atual (ex: antes da Copa), mostrar os próximos 4 jogos futuros.
+3. **Expor como utilitário Tailwind**
+   - Em `tailwind.config.ts`, adicionar `fwc: ['"FWC 26"', 'DM Serif Display', 'serif']` em `fontFamily` — gera a classe `font-fwc`.
+   - DM Serif Display (atual) e DM Sans continuam intactos para o resto do app.
 
-### 4. `/predictions` — Realtime para matches, scores e predictions
-Já existe um channel realtime que escuta `matches`, `scores` e `predictions`. Verificar se está funcionando corretamente:
-- O channel atual escuta `UPDATE` em `matches` e `*` em `scores`/`predictions` — isso já deveria cobrir atualizações do admin.
-- Verificar se `matches` e `predictions` estão na publicação `supabase_realtime`. Se não, criar uma migration para adicionar.
-- Garantir que o `fetchMatches()` e `fetchAllPredictions()` e `fetchAllScores()` são chamados no callback.
+4. **Aplicar nos dois únicos locais combinados**
+   - `src/pages/AuthPage.tsx`: adicionar `font-fwc` nos dois `<h1>`/`<p>` que renderizam "Rebolão" e "2026".
+   - `src/components/AppLayout.tsx`: adicionar `font-fwc` no `<h1>` "Rebolão da Copa 2026" do header.
 
-**Migration SQL necessária:**
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE public.matches;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.predictions;
-```
-(A tabela `scores` provavelmente já foi adicionada em migration anterior.)
+### Fora de escopo (não vou tocar)
+- Subtítulos, body, botões, qualquer outro título do app.
+- Cores, tamanhos, espaçamentos, estrutura — apenas a `font-family` muda nesses 3 elementos.
 
-### 5. `/all-predictions` — Realtime
-Adicionar subscription realtime no `AllPredictionsPage` para `matches`, `scores` e `predictions`, re-fetching dados quando houver mudanças.
+### Arquivos afetados
+- `public/fonts/` (novos arquivos)
+- `src/index.css` (+ `@font-face`)
+- `tailwind.config.ts` (+ entrada `fwc` em `fontFamily`)
+- `src/pages/AuthPage.tsx` (+ classe `font-fwc` em 2 elementos)
+- `src/components/AppLayout.tsx` (+ classe `font-fwc` em 1 elemento)
 
-### Arquivos modificados
-- **Migration SQL** — habilitar realtime em `matches` e `predictions`
-- **`src/pages/AllPredictionsPage.tsx`** — ordenação alfabética, posição no ranking, remoção da barra, realtime
-- **`src/pages/PredictionsPage.tsx`** — texto descritivo no expandable, filtro PRÓXIMOS JOGOS sem esconder encerrados
+Aguardo o(s) arquivo(s) da fonte para implementar.
