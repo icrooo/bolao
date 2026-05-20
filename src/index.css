@@ -90,6 +90,7 @@
     --score-partial: 215 55% 52%;
     --score-miss: 220 10% 40%;
     --score-negative: 0 55% 55%;
+    --score-missed: 270 60% 70%;
 
     --surface-blur: 220 18% 12%;
 
