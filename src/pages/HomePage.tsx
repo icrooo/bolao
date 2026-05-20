@@ -132,7 +132,7 @@ export default function HomePage() {
               O vencedor do <strong>REBOLÃO</strong> leva <strong>90% de todo o valor arrecadado</strong>.
             </p>
             <p className="text-sm text-muted-foreground mt-1 font-normal">
-              O resto é <strong>TAXA ADMINISTRATIVA!!!! kkkkkkkkkk</strong>
+              O resto é <strong>TAXA ADMINISTRATIVA!!!! kkkkkk</strong>
             </p>
           </div>
         </section>
