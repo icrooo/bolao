@@ -21,9 +21,10 @@ type Score = { match_id: string; points: number; is_provisional?: boolean };
 export type MatchPredictionEntry = {
   user_id: string;
   name: string;
-  home_score_pred: number;
-  away_score_pred: number;
+  home_score_pred: number | null;
+  away_score_pred: number | null;
   points: number | null;
+  missed?: boolean;
 };
 
 const LOCK_MINUTES = 10;
