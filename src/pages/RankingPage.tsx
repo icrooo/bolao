@@ -287,7 +287,7 @@ export default function RankingPage() {
                         <span className="text-[8px] text-muted-foreground leading-tight">-1</span>
                       </div>
                       <div className="flex flex-col items-center">
-                        <span className="text-xs font-bold text-muted-foreground">{entry.missed_count}</span>
+                        <span className="text-xs font-bold text-score-missed">{entry.missed_count}</span>
                         <span className="text-[8px] text-muted-foreground leading-tight">💭</span>
                       </div>
                     </div>
