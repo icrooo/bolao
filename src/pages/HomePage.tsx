@@ -75,7 +75,7 @@ export default function HomePage() {
                 <p className="text-sm text-muted-foreground">Você acertou o placar exato do jogo.</p>
                 <p className="text-xs text-muted-foreground mt-1">Ex.: palpite 2x1 · resultado 2x1</p>
               </div>
-              <span className="font-serif text-xl text-emerald-600 dark:text-emerald-400 whitespace-nowrap">+5</span>
+              <span className="text-xl font-bold text-green-600 whitespace-nowrap">+5</span>
             </div>
           </div>
 
@@ -86,7 +86,7 @@ export default function HomePage() {
                 <p className="text-sm text-muted-foreground">Acertou o vencedor (ou empate), mas não o placar.</p>
                 <p className="text-xs text-muted-foreground mt-1">Ex.: palpite 2x1 · resultado 2x0</p>
               </div>
-              <span className="font-serif text-xl text-blue-600 dark:text-blue-400 whitespace-nowrap">+2</span>
+              <span className="text-xl font-bold text-yellow-600 whitespace-nowrap">+2</span>
             </div>
           </div>
 
@@ -97,7 +97,7 @@ export default function HomePage() {
                 <p className="text-sm text-muted-foreground">Não acertou nada.</p>
                 <p className="text-xs text-muted-foreground mt-1">Ex.: palpite 2x1 · resultado 1x1</p>
               </div>
-              <span className="font-serif text-xl text-muted-foreground whitespace-nowrap">0</span>
+              <span className="text-xl font-bold text-muted-foreground whitespace-nowrap">0</span>
             </div>
           </div>
 
@@ -108,7 +108,7 @@ export default function HomePage() {
                 <p className="text-sm text-muted-foreground">Acertou o placar exatamente contrário</p>
                 <p className="text-xs text-muted-foreground mt-1">Ex.: palpite 3x0 · resultado 0x3</p>
               </div>
-              <span className="font-serif text-xl text-red-600 dark:text-red-400 whitespace-nowrap">−1</span>
+              <span className="text-xl font-bold text-destructive whitespace-nowrap">-1</span>
             </div>
           </div>
 
@@ -117,9 +117,8 @@ export default function HomePage() {
               <div>
                 <h4 className="font-medium">ESQUECEU</h4>
                 <p className="text-sm text-muted-foreground">Penalidade por não enviar palpite antes do bloqueio.</p>
-                <p className="text-xs text-muted-foreground mt-1">Ex.: nenhum palpite registrado</p>
               </div>
-              <span className="font-serif text-xl text-red-600 dark:text-red-400 whitespace-nowrap">−2</span>
+              <span className="text-xl font-bold text-destructive whitespace-nowrap">-2</span>
             </div>
           </div>
         </section>
@@ -129,12 +128,11 @@ export default function HomePage() {
           <h3 className="font-serif text-xl">Premiação</h3>
           <div className="glass-card p-5 text-center">
             <TrophyIcon className="h-8 w-8 text-primary mx-auto mb-2" />
-            <p className="font-serif text-2xl">95%</p>
             <p className="text-sm text-muted-foreground mt-1 font-normal">
               O vencedor do <strong>REBOLÃO</strong> leva <strong>95% de todo o valor arrecadado</strong>.
             </p>
             <p className="text-sm text-muted-foreground mt-1 font-normal">
-              O resto é TAXA ADMINISTRATIVA!!! kkkkkk
+              O resto é <strong>TAXA ADMINISTRATIVA!!!! kkkkkkkkkk</strong>
             </p>
           </div>
         </section>
