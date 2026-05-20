@@ -235,7 +235,7 @@ export default function RankingPage() {
               <span>+5 = <span className="font-bold text-green-600">EXATO</span></span>
               <span>+2 = <span className="font-bold text-yellow-600">QUASE</span></span>
               <span>-1 = <span className="font-bold text-destructive">INVERSO</span></span>
-              <span>💭 = <span className="font-bold text-score-missed">ESQUECEU</span></span>
+              <span>-2 = <span className="font-bold text-score-missed">ESQUECEU</span></span>
             </div>
             {ranking.map((entry, i) => {
               const isLastPosition = ranking.length > 1 && entry.position === ranking[ranking.length - 1].position;
@@ -288,7 +288,7 @@ export default function RankingPage() {
                       </div>
                       <div className="flex flex-col items-center">
                         <span className="text-xs font-bold text-score-missed">{entry.missed_count}</span>
-                        <span className="text-[8px] text-muted-foreground leading-tight">💭</span>
+                        <span className="text-[8px] text-muted-foreground leading-tight">-2</span>
                       </div>
                     </div>
                   </div>
