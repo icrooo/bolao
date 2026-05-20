@@ -14,7 +14,7 @@ export default function HomePage() {
             Bem vindo, {profile?.name?.split(' ')[0] || 'amiguinho'}!
           </h2>
           <p className="text-sm text-muted-foreground mt-1 font-normal">
-            Que comece a zorra. Boa sorte nos palpites. 🍀
+            Que comece a zorra. Boa sorte nos palpites 🍀
           </p>
         </section>
 
@@ -105,7 +105,7 @@ export default function HomePage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h4 className="font-medium">INVERTIDO</h4>
-                <p className="text-sm text-muted-foreground">Acertou o placar exatamente contrário</p>
+                <p className="text-sm text-muted-foreground">Acertou o placar exatamente contrário.</p>
                 <p className="text-xs text-muted-foreground mt-1">Ex.: palpite 3x0 · resultado 0x3</p>
               </div>
               <span className="text-xl font-bold text-destructive whitespace-nowrap">-1</span>
