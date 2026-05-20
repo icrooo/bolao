@@ -199,7 +199,7 @@ function ExpandablePredictions({ match, currentUserId, fetchMatchPredictions, ca
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {isMissed ? (
-                    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-score-missed text-white">−2 pts</span>
+                    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-score-missed text-white">-x-</span>
                   ) : (
                     <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${getColor(e.points)}`}>{e.home_score_pred}×{e.away_score_pred}</span>
                   )}
