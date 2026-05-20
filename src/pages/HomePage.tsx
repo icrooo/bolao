@@ -118,7 +118,7 @@ export default function HomePage() {
                 <h4 className="font-medium">ESQUECEU</h4>
                 <p className="text-sm text-muted-foreground">Penalidade por não enviar palpite antes do bloqueio.</p>
               </div>
-              <span className="text-xl font-bold text-destructive whitespace-nowrap">-2</span>
+              <span className="text-xl font-bold text-score-missed whitespace-nowrap">-2</span>
             </div>
           </div>
         </section>
