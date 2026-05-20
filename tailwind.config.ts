@@ -17,7 +17,7 @@ export default {
       fontFamily: {
         sans: ["DM Sans", "system-ui", "sans-serif"],
         serif: ["DM Serif Display", "Georgia", "serif"],
-        fwc: ['"FWC 26"', "DM Serif Display", "serif"],
+        
       },
       colors: {
         border: "hsl(var(--border))",

@@ -1,19 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display&display=swap');
 
-@font-face {
-  font-family: 'FWC 26';
-  src: url('/fonts/FWC2026-NormalBlack.ttf') format('truetype');
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'FWC 26';
-  src: url('/fonts/FWC2026-ExpandedBlack.ttf') format('truetype');
-  font-weight: 900;
-  font-style: italic;
-  font-display: swap;
-}
 
 @tailwind base;
 @tailwind components;
