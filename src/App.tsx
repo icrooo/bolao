@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute, AdminRoute } from "@/components/ProtectedRoute";
 import AuthPage from "./pages/AuthPage";
+import HomePage from "./pages/HomePage";
 import PredictionsPage from "./pages/PredictionsPage";
 import RankingPage from "./pages/RankingPage";
 import AllPredictionsPage from "./pages/AllPredictionsPage";
@@ -22,6 +23,7 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/" element={<AuthPage />} />
+            <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
             <Route path="/predictions" element={<ProtectedRoute><PredictionsPage /></ProtectedRoute>} />
             <Route path="/ranking" element={<ProtectedRoute><RankingPage /></ProtectedRoute>} />
             <Route path="/all-predictions" element={<ProtectedRoute><AllPredictionsPage /></ProtectedRoute>} />
