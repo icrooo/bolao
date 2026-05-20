@@ -129,7 +129,7 @@ export default function HomePage() {
           <div className="glass-card p-5 text-center">
             <TrophyIcon className="h-8 w-8 text-primary mx-auto mb-2" />
             <p className="text-sm text-muted-foreground mt-1 font-normal">
-              O vencedor do <strong>REBOLÃO</strong> leva <strong>95% de todo o valor arrecadado</strong>.
+              O vencedor do <strong>REBOLÃO</strong> leva <strong>90% de todo o valor arrecadado</strong>.
             </p>
             <p className="text-sm text-muted-foreground mt-1 font-normal">
               O resto é <strong>TAXA ADMINISTRATIVA!!!! kkkkkkkkkk</strong>
