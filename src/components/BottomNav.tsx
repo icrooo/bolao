@@ -1,8 +1,9 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Trophy, Target, Users, Shield } from 'lucide-react';
+import { Trophy, Target, Users, Shield, Home } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
+  { to: '/home', label: 'Início', icon: Home },
   { to: '/predictions', label: 'Palpites', icon: Target },
   { to: '/ranking', label: 'Ranking', icon: Trophy },
   { to: '/all-predictions', label: 'Todos', icon: Users },
