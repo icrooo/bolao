@@ -126,6 +126,7 @@ export type Database = {
           home_score_pred: number
           id: string
           match_id: string
+          name: string | null
           updated_at: string
           user_id: string
         }
@@ -135,6 +136,7 @@ export type Database = {
           home_score_pred: number
           id?: string
           match_id: string
+          name?: string | null
           updated_at?: string
           user_id: string
         }
@@ -144,6 +146,7 @@ export type Database = {
           home_score_pred?: number
           id?: string
           match_id?: string
+          name?: string | null
           updated_at?: string
           user_id?: string
         }
