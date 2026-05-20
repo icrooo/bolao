@@ -128,7 +128,14 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <div className="flex min-h-screen items-center justify-center px-4 relative">
+      <button
+        onClick={toggle}
+        className="absolute top-4 right-4 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors active:scale-95"
+        aria-label="Alternar tema"
+      >
+        {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+      </button>
       <div className="w-full max-w-sm animate-reveal-up">
         <div className="text-center mb-8">
           <h1 className="font-serif text-4xl mb-1" style={{ lineHeight: '1.1' }}>Rebolão da Copa</h1>
