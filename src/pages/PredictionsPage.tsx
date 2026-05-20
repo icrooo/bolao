@@ -21,9 +21,10 @@ type Score = { match_id: string; points: number; is_provisional?: boolean };
 export type MatchPredictionEntry = {
   user_id: string;
   name: string;
-  home_score_pred: number;
-  away_score_pred: number;
+  home_score_pred: number | null;
+  away_score_pred: number | null;
   points: number | null;
+  missed?: boolean;
 };
 
 const LOCK_MINUTES = 10;
@@ -136,12 +137,18 @@ function ExpandablePredictions({ match, currentUserId, fetchMatchPredictions, ca
   const entries = useMemo(() => {
     if (!cachedEntries) return [];
     const list = cachedEntries.map(e => {
-      const partialPts = (match.home_score !== null && match.away_score !== null)
+      if (e.missed) return e;
+      const partialPts = (match.home_score !== null && match.away_score !== null && e.home_score_pred !== null && e.away_score_pred !== null)
         ? calcPoints({ home_score_pred: e.home_score_pred, away_score_pred: e.away_score_pred }, match.home_score, match.away_score)
         : null;
       return { ...e, points: e.points ?? partialPts };
     });
-    list.sort((a, b) => { if (a.user_id === currentUserId) return -1; if (b.user_id === currentUserId) return 1; return a.name.localeCompare(b.name); });
+    list.sort((a, b) => {
+      if (a.user_id === currentUserId) return -1;
+      if (b.user_id === currentUserId) return 1;
+      if (!!a.missed !== !!b.missed) return a.missed ? 1 : -1;
+      return a.name.localeCompare(b.name);
+    });
     return list;
   }, [cachedEntries, match.home_score, match.away_score, currentUserId]);
 
@@ -173,9 +180,10 @@ function ExpandablePredictions({ match, currentUserId, fetchMatchPredictions, ca
               if (pts === -1) return '🤣';
               return '';
             };
-            const emoji = getScoreEmoji(e.points);
             const pos = positionByUser.get(e.user_id);
             const shared = sharedGroupsByUser.get(e.user_id) ?? [];
+            const isMissed = e.missed;
+            const emoji = isMissed ? '💭' : getScoreEmoji(e.points);
             return (
               <div key={e.user_id} className={`flex items-center justify-between px-3 py-1.5 rounded-md text-xs ${e.user_id === currentUserId ? 'bg-primary/5 font-semibold' : 'bg-secondary/50'}`}>
                 <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -190,7 +198,11 @@ function ExpandablePredictions({ match, currentUserId, fetchMatchPredictions, ca
                   </span>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${getColor(e.points)}`}>{e.home_score_pred}×{e.away_score_pred}</span>
+                  {isMissed ? (
+                    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-score-missed text-white">−2 pts</span>
+                  ) : (
+                    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${getColor(e.points)}`}>{e.home_score_pred}×{e.away_score_pred}</span>
+                  )}
                   {emoji && <span className="text-sm">{emoji}</span>}
                 </div>
               </div>
@@ -296,7 +308,18 @@ export default function PredictionsPage() {
           away_score_pred: p.away_score_pred,
           points: scoreMap.has(p.user_id) ? (scoreMap.get(p.user_id) as number) : null,
         }));
-      setMatchPredictionsCache(prev => ({ ...prev, [matchId]: entries }));
+      const predictedUserIds = new Set(entries.map(e => e.user_id));
+      const missedEntries: MatchPredictionEntry[] = Array.from(profileMap.entries())
+        .filter(([uid]) => !predictedUserIds.has(uid))
+        .map(([uid, name]) => ({
+          user_id: uid,
+          name: name ?? 'Desconhecido',
+          home_score_pred: null,
+          away_score_pred: null,
+          points: -2,
+          missed: true,
+        }));
+      setMatchPredictionsCache(prev => ({ ...prev, [matchId]: [...entries, ...missedEntries] }));
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {
