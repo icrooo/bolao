@@ -308,7 +308,18 @@ export default function PredictionsPage() {
           away_score_pred: p.away_score_pred,
           points: scoreMap.has(p.user_id) ? (scoreMap.get(p.user_id) as number) : null,
         }));
-      setMatchPredictionsCache(prev => ({ ...prev, [matchId]: entries }));
+      const predictedUserIds = new Set(entries.map(e => e.user_id));
+      const missedEntries: MatchPredictionEntry[] = Array.from(profileMap.entries())
+        .filter(([uid]) => !predictedUserIds.has(uid))
+        .map(([uid, name]) => ({
+          user_id: uid,
+          name: name ?? 'Desconhecido',
+          home_score_pred: null,
+          away_score_pred: null,
+          points: -2,
+          missed: true,
+        }));
+      setMatchPredictionsCache(prev => ({ ...prev, [matchId]: [...entries, ...missedEntries] }));
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {
