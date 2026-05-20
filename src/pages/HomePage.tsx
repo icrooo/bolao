@@ -48,7 +48,7 @@ export default function HomePage() {
               <h4 className="font-medium">Todos</h4>
             </div>
             <p className="text-sm text-muted-foreground">
-              Visualize os palpites de todos os participantes em cada jogo já bloqueado. Sem segredo, sem trapaça.
+              Visualize os palpites de todos os participantes em cada jogo depois de bloqueado. Hora de curiar!
             </p>
           </div>
         </section>
@@ -60,11 +60,11 @@ export default function HomePage() {
           <div className="glass-card p-4 border-l-4 border-l-primary">
             <div className="flex items-center gap-2 mb-1">
               <Lock className="h-4 w-4 text-primary" />
-              <h4 className="font-medium text-sm">Prazo para palpitar</h4>
+              <h4 className="font-medium text-base">Prazo para palpitar</h4>
             </div>
             <p className="text-sm text-muted-foreground">
               Os jogos ficam abertos para palpites <strong>até 10 minutos antes</strong> do horário previsto de início.
-              Depois disso, são <strong>bloqueados</strong> e os palpites de todos os amiguinhos ficam visíveis para todos.
+              Depois disso, são <strong>bloqueados</strong> e os palpites de todos os amiguinhos ficam visíveis na aba Todos.
             </p>
           </div>
 
