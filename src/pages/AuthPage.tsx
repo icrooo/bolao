@@ -32,7 +32,14 @@ function useTheme() {
 export default function AuthPage() {
   const { user, profile, loading } = useAuth();
   const { theme, toggle } = useTheme();
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('hasVisitedAuth') === '1';
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('hasVisitedAuth', '1'); } catch {}
+  }, []);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -131,7 +138,7 @@ export default function AuthPage() {
     <div className="flex min-h-screen items-center justify-center px-4 relative">
       <button
         onClick={toggle}
-        className="absolute top-4 right-4 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors active:scale-95"
+        className="absolute top-3 right-4 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors active:scale-95"
         aria-label="Alternar tema"
       >
         {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

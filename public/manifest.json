@@ -1,0 +1,26 @@
+{
+  "name": "REBOLÃO 2026",
+  "short_name": "REBOLÃO 2026",
+  "description": "O Rebolão da Copa 2026 finalmente chegou!!!",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fbf9f3",
+  "theme_color": "#498c66",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
