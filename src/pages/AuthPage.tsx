@@ -5,7 +5,7 @@ import { Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Loader2, Eye, EyeOff, Moon, Sun, Lock, Trophy as TrophyIcon, HelpCircle } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Moon, Sun, Lock, Trophy as TrophyIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 function useTheme() {
@@ -260,15 +260,6 @@ export default function AuthPage() {
             </form>
           )}
 
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full mt-4 gap-2"
-            onClick={() => setHowItWorksOpen(true)}
-          >
-            <HelpCircle className="h-4 w-4" />
-            COMO FUNCIONA?
-          </Button>
 
           <p className="text-center text-sm text-muted-foreground mt-4">
             {forgotPassword ? (
