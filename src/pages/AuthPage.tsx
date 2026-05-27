@@ -5,7 +5,7 @@ import { Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Loader2, Eye, EyeOff, Moon, Sun, Lock, Trophy as TrophyIcon } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Moon, Sun, Lock, Trophy as TrophyIcon, CircleHelp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 function useTheme() {
@@ -157,28 +157,15 @@ export default function AuthPage() {
               <p className="text-muted-foreground text-sm mt-3">
                 Informe seu e-mail para recuperar a senha
               </p>
-            ) : isLogin ? (
-              <p className="text-muted-foreground text-sm mt-3">
-                Entre para acessar seus palpites, mas antes{' '}
-                <button
-                  type="button"
-                  onClick={() => setHowItWorksOpen(true)}
-                  className="text-primary font-medium hover:underline inline"
-                >
-                  clique aqui e saiba COMO FUNCIONA
-                </button>
-              </p>
             ) : (
-              <p className="text-muted-foreground text-sm mt-3">
-                Solicite seu acesso ao bolão, mas antes{' '}
-                <button
-                  type="button"
-                  onClick={() => setHowItWorksOpen(true)}
-                  className="text-primary font-medium hover:underline inline"
-                >
-                  clique aqui e saiba COMO FUNCIONA
-                </button>
-              </p>
+              <button
+                type="button"
+                onClick={() => setHowItWorksOpen(true)}
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors mt-3"
+              >
+                <CircleHelp className="h-3.5 w-3.5" />
+                COMO FUNCIONA?
+              </button>
             )}
           </div>
 
