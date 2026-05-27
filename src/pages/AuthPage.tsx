@@ -161,7 +161,7 @@ export default function AuthPage() {
               <button
                 type="button"
                 onClick={() => setHowItWorksOpen(true)}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors mt-3"
+                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline mt-3"
               >
                 <CircleHelp className="h-3.5 w-3.5" />
                 COMO FUNCIONA?
