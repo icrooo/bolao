@@ -327,7 +327,14 @@ export default function PredictionsPage() {
     }
   }, []);
 
+  const scoresDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
+    const debouncedFetchScores = () => {
+      if (scoresDebounceRef.current) clearTimeout(scoresDebounceRef.current);
+      scoresDebounceRef.current = setTimeout(() => { fetchScores(); }, 600);
+    };
+
     const channel = supabase
       .channel('matches-realtime-pred')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' }, (payload: { new?: { id?: string } }) => {
@@ -339,7 +346,7 @@ export default function PredictionsPage() {
         }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, (payload: { new?: { match_id?: string }; old?: { match_id?: string } }) => {
-        fetchScores();
+        debouncedFetchScores();
         const mid = payload?.new?.match_id ?? payload?.old?.match_id;
         if (mid && cacheRef.current[mid]) {
           fetchMatchPredictions(mid);
@@ -352,7 +359,10 @@ export default function PredictionsPage() {
         }
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (scoresDebounceRef.current) clearTimeout(scoresDebounceRef.current);
+      supabase.removeChannel(channel);
+    };
   }, [user, fetchMatchPredictions]);
 
   const fetchData = async () => {

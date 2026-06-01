@@ -83,27 +83,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
 
     const fetchProfile = async () => {
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      try {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      if (profileData) {
-        setProfile({ name: profileData.name, is_approved: profileData.is_approved, user_id: profileData.user_id });
+        if (profileData) {
+          setProfile({ name: profileData.name, is_approved: profileData.is_approved, user_id: profileData.user_id });
+        }
+
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id);
+
+        if (cancelled) return;
+
+        setIsAdmin(roleData?.some(r => r.role === 'admin') ?? false);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
-
-      if (cancelled) return;
-
-      setIsAdmin(roleData?.some(r => r.role === 'admin') ?? false);
-      setLoading(false);
     };
 
     fetchProfile();
