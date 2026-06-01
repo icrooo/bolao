@@ -85,12 +85,13 @@ export default function AdminPage() {
   };
 
   const deleteUser = async (profile: Profile) => {
-    await supabase.from('scores').delete().eq('user_id', profile.user_id);
-    await supabase.from('predictions').delete().eq('user_id', profile.user_id);
-    await supabase.from('user_roles').delete().eq('user_id', profile.user_id);
-    await supabase.from('user_friendship_groups').delete().eq('user_id', profile.user_id);
-    const { error } = await supabase.from('profiles').delete().eq('user_id', profile.user_id);
-    if (error) { toast.error(error.message); return; }
+    const { data, error } = await supabase.functions.invoke('delete-user', {
+      body: { user_id: profile.user_id },
+    });
+    if (error || (data && (data as { error?: string }).error)) {
+      toast.error(error?.message ?? (data as { error?: string })?.error ?? 'Erro ao excluir usuário');
+      return;
+    }
     toast.success('Usuário excluído!');
     setProfiles(prev => prev.filter(p => p.user_id !== profile.user_id));
     setConfirmDeleteUser(null);
