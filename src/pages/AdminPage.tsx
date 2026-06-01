@@ -205,7 +205,8 @@ export default function AdminPage() {
   };
 
   const restartMatch = async (matchId: string) => {
-    await supabase.from('scores').delete().eq('match_id', matchId);
+    const { error: delError } = await supabase.from('scores').delete().eq('match_id', matchId);
+    if (delError) { toast.error(delError.message); return; }
     const { error } = await supabase.from('matches').update({ is_started: false, is_finished: false, home_score: null, away_score: null }).eq('id', matchId);
     if (error) { toast.error(error.message); return; }
     toast.success('Jogo reiniciado!');
