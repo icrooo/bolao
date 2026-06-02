@@ -33,56 +33,28 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user) return;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     fetchRank();
 
     const channel = supabase
       .channel('rank-header')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => fetchRank())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => fetchRank(), 600);
+      })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const fetchRank = async () => {
     if (!user) return;
-    const { data: profiles } = await supabase.from('profiles').select('user_id').eq('is_approved', true);
-    if (!profiles) return;
-
-    const { data: allScores } = await supabase.from('scores').select('user_id, points');
-    if (!allScores) return;
-
-    const userMap = new Map<string, { total: number; exact: number; partial: number; negative: number }>();
-    profiles.forEach(p => userMap.set(p.user_id, { total: 0, exact: 0, partial: 0, negative: 0 }));
-    allScores.forEach(s => {
-      const entry = userMap.get(s.user_id);
-      if (!entry) return;
-      entry.total += s.points;
-      if (s.points === 5) entry.exact++;
-      else if (s.points === 2) entry.partial++;
-      else if (s.points === -1) entry.negative++;
-    });
-
-    const sorted = Array.from(userMap.entries())
-      .map(([uid, e]) => ({ uid, ...e }))
-      .sort((a, b) => {
-        if (b.total !== a.total) return b.total - a.total;
-        if (b.exact !== a.exact) return b.exact - a.exact;
-        if (b.partial !== a.partial) return b.partial - a.partial;
-        return a.negative - b.negative;
-      });
-
-    const positions: number[] = [];
-    for (let i = 0; i < sorted.length; i++) {
-      if (i > 0 && sorted[i].total === sorted[i-1].total && sorted[i].exact === sorted[i-1].exact && sorted[i].partial === sorted[i-1].partial && sorted[i].negative === sorted[i-1].negative) {
-        positions.push(positions[i - 1]);
-      } else {
-        positions.push(i + 1);
-      }
-    }
-
-    const idx = sorted.findIndex(e => e.uid === user.id);
-    if (idx !== -1) {
-      setRank({ position: positions[idx], points: sorted[idx].total });
-    }
+    const { data, error } = await supabase.rpc('get_user_rank', { p_user_id: user.id });
+    if (error || !data || data.length === 0) return;
+    const row = data[0];
+    setRank({ position: row.user_position, points: Number(row.total_points) });
   };
 
   return (
