@@ -177,19 +177,13 @@ export default function AdminPage() {
   const adjustScore = async (matchId: string, field: 'home_score' | 'away_score', delta: number) => {
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
-    const current = match[field] ?? 0;
-    const newVal = Math.max(0, current + delta);
-    const otherField = field === 'home_score' ? 'away_score' : 'home_score';
     setUpdatingScore(matchId);
-    const updatePayload: { home_score?: number; away_score?: number } = { [field]: newVal };
-    if (match[otherField] === null) updatePayload[otherField] = 0;
-    const { error } = await supabase.from('matches').update(updatePayload).eq('id', matchId);
+    const { error } = await supabase.rpc('admin_adjust_score', {
+      p_match_id: matchId,
+      p_field: field,
+      p_delta: delta,
+    });
     if (error) { toast.error(error.message); setUpdatingScore(null); return; }
-    // Calculate live provisional scores for in-progress matches
-    const rpcRes = (match.is_started && !match.is_finished)
-      ? await supabase.rpc('calculate_live_scores', { p_match_id: matchId })
-      : await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
-    if (rpcRes.error) { toast.error(rpcRes.error.message); setUpdatingScore(null); return; }
     setUpdatingScore(null);
     fetchData();
   };

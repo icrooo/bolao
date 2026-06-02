@@ -84,14 +84,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const fetchProfile = async () => {
       try {
-        const { data: profileData } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('*')
+          .select('user_id, name, is_approved')
           .eq('user_id', user.id)
           .single();
 
         if (cancelled) return;
 
+        if (profileError) {
+          console.error('Failed to load profile:', profileError);
+        }
         if (profileData) {
           setProfile({ name: profileData.name, is_approved: profileData.is_approved, user_id: profileData.user_id });
         }

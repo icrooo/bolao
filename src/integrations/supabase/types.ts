@@ -271,6 +271,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_adjust_score: {
+        Args: { p_delta: number; p_field: string; p_match_id: string }
+        Returns: undefined
+      }
       admin_finish_match: { Args: { p_match_id: string }; Returns: undefined }
       admin_get_profiles: {
         Args: never
