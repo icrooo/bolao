@@ -196,19 +196,15 @@ export default function AdminPage() {
 
   const startMatch = async (matchId: string) => {
     setStartingMatch(matchId);
-    const { error } = await supabase.from('matches').update({ is_started: true, home_score: 0, away_score: 0 }).eq('id', matchId);
+    const { error } = await supabase.rpc('admin_start_match', { p_match_id: matchId });
     if (error) { toast.error(error.message); setStartingMatch(null); return; }
-    const { error: rpcError } = await supabase.rpc('calculate_live_scores', { p_match_id: matchId });
-    if (rpcError) { toast.error(rpcError.message); setStartingMatch(null); return; }
     toast.success('Jogo iniciado!');
     setStartingMatch(null);
     fetchData();
   };
 
   const restartMatch = async (matchId: string) => {
-    const { error: delError } = await supabase.from('scores').delete().eq('match_id', matchId);
-    if (delError) { toast.error(delError.message); return; }
-    const { error } = await supabase.from('matches').update({ is_started: false, is_finished: false, home_score: null, away_score: null }).eq('id', matchId);
+    const { error } = await supabase.rpc('admin_restart_match', { p_match_id: matchId });
     if (error) { toast.error(error.message); return; }
     toast.success('Jogo reiniciado!');
     setConfirmRestart(null);
@@ -229,10 +225,8 @@ export default function AdminPage() {
       toast.error('Atualize o placar antes de encerrar'); return;
     }
     setFinishingMatch(matchId);
-    const { error } = await supabase.from('matches').update({ is_finished: true }).eq('id', matchId);
+    const { error } = await supabase.rpc('admin_finish_match', { p_match_id: matchId });
     if (error) { toast.error(error.message); setFinishingMatch(null); return; }
-    const { error: rpcError } = await supabase.rpc('calculate_match_scores', { p_match_id: matchId });
-    if (rpcError) { toast.error(rpcError.message); setFinishingMatch(null); return; }
     toast.success('Jogo encerrado!');
     setFinishingMatch(null);
     setConfirmFinish(null);
