@@ -271,6 +271,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_finish_match: { Args: { p_match_id: string }; Returns: undefined }
       admin_get_profiles: {
         Args: never
         Returns: {
@@ -282,6 +283,8 @@ export type Database = {
           user_id: string
         }[]
       }
+      admin_restart_match: { Args: { p_match_id: string }; Returns: undefined }
+      admin_start_match: { Args: { p_match_id: string }; Returns: undefined }
       calculate_live_scores: {
         Args: { p_match_id: string }
         Returns: undefined
@@ -305,6 +308,13 @@ export type Database = {
           out_position: number
           out_total_points: number
           out_user_id: string
+        }[]
+      }
+      get_user_rank: {
+        Args: { p_user_id: string }
+        Returns: {
+          total_points: number
+          user_position: number
         }[]
       }
       has_role: {
