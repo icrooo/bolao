@@ -271,6 +271,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_get_profiles: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          id: string
+          is_approved: boolean
+          name: string
+          user_id: string
+        }[]
+      }
       calculate_live_scores: {
         Args: { p_match_id: string }
         Returns: undefined
