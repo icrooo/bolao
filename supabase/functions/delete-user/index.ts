@@ -32,7 +32,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    const admin = createClient(supabaseUrl, serviceKey);
     const { data: roleRow } = await admin
       .from('user_roles')
       .select('role')
