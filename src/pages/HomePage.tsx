@@ -1,6 +1,12 @@
+import { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Target, Trophy, Users, Lock, Trophy as TrophyIcon } from 'lucide-react';
+
+function formatBRL(value: number) {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+}
 
 export default function HomePage() {
   const { profile } = useAuth();
