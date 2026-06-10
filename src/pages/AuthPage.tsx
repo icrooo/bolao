@@ -42,12 +42,11 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (!howItWorksOpen) return;
-    supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_approved', true)
-      .then(({ count }) => setApprovedCount(count ?? 0));
+    supabase.rpc('get_approved_count').then(({ data }) => {
+      setApprovedCount(typeof data === 'number' ? data : 0);
+    });
   }, [howItWorksOpen]);
+
 
   const prizeSecond = 200;
   const prizeThird = 150;

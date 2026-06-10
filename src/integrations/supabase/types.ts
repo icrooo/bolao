@@ -297,6 +297,7 @@ export type Database = {
         Args: { p_match_id: string }
         Returns: undefined
       }
+      get_approved_count: { Args: never; Returns: number }
       get_ranking: {
         Args: {
           p_date?: string
