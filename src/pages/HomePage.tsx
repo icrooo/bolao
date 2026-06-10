@@ -180,11 +180,6 @@ export default function HomePage() {
             </p>
           </div>
         </section>
-
-              O resto é <strong>TAXA ADMINISTRATIVA!!!! kkkkkk</strong>
-            </p>
-          </div>
-        </section>
       </div>
     </AppLayout>
   );
