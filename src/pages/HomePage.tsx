@@ -10,6 +10,23 @@ function formatBRL(value: number) {
 
 export default function HomePage() {
   const { profile } = useAuth();
+  const [approvedCount, setApprovedCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_approved', true)
+      .then(({ count }) => setApprovedCount(count ?? 0));
+  }, []);
+
+  const second = 200;
+  const third = 150;
+  const fourth = 100;
+  const fifth = 50;
+  const first = approvedCount !== null ? Math.max(0, approvedCount * 50 * 0.9 - second - third - fourth - fifth) : null;
+
+
 
   return (
     <AppLayout>
