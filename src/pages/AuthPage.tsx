@@ -38,6 +38,26 @@ export default function AuthPage() {
     return localStorage.getItem('hasVisitedAuth') === '1';
   });
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+  const [approvedCount, setApprovedCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!howItWorksOpen) return;
+    supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_approved', true)
+      .then(({ count }) => setApprovedCount(count ?? 0));
+  }, [howItWorksOpen]);
+
+  const prizeSecond = 200;
+  const prizeThird = 150;
+  const prizeFourth = 100;
+  const prizeFifth = 50;
+  const prizeFirst = approvedCount !== null
+    ? Math.max(0, approvedCount * 50 * 0.9 - prizeSecond - prizeThird - prizeFourth - prizeFifth)
+    : null;
+  const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+
 
   useEffect(() => {
     try { localStorage.setItem('hasVisitedAuth', '1'); } catch {}
